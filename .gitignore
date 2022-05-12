@@ -1,0 +1,9 @@
+# Ignore the /dist and node_modules directories
+/dist/
+/node_modules/
+
+# Ignore all Visual Studio Project Files
+/**.njsproj**
+
+# Ignore package-lock.json
+/package-lock.json

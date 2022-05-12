@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'"> -->
+    <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+
+    <link href="./quill/quill.snow.css" rel="stylesheet">
+    <link href="main.css" rel="stylesheet" />
+
+    <script defer type="module" src="./quill/quill.js"></script>
+    <script defer type="module" src="./quill/quill.min.js"></script>
+    <script defer src="main.js"></script>
+</head>
+
+<body hidden>
+    <div class="global-container">
+        <div id="lists_container">
+            <div class="articles_list_container">
+                <h2>Articles</h2>
+                <ul id="articles_list">
+                </ul>
+                <div>
+                    <button id="add_art_btn">Add New Article</button>
+                    <button id="remove_art">Remove Article</button>
+                </div>
+            </div>
+            <div class="slides_list_container">
+                <h1>Slides</h1>
+                <ol id="slides_list">
+                </ol>
+                <div>
+                    <div>
+                        <button id="nxt_btn">Add New Slide</button>
+                        <button id="rmv_btn">Remove Slide</button>
+                    </div>
+                    <div>
+                        <button id="move_slide_up">Move Slide Up</button>
+                        <button id="move_slide_down">Move Slide Down</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="main">
+            <div>
+                <div style="vertical-align: middle">
+                    <button id="image_selector"><img src="" alt="Select Image"
+                            style="max-width: 150px;max-height: 150px;" id="selected_image"></button>
+                </div>
+                <div>
+                    <input type="checkbox" name="invert_fit" value="" id="inverse-fit-checkbox" />
+                    <label for="invert_fit">Smaller fit (show blurred background)</label>
+                </div>
+            </div>
+            <div>
+                <label for="slide_title">Title: </label>
+                <input type="text" name="slide_title" id="slide_title" value="" size="45" />
+            </div>
+            <div id="scrolling-container">
+                <div id="toolbar">
+                    <span class="ql-formats">
+                        <button type="button" class="ql-bold"></button>
+                        <button type="button" class="ql-italic"></button>
+                        <button type="button" class="ql-list" value="bullet"></button>
+
+                        <!-- <button class="ql-script" value="sub"></button> -->
+                        <!-- <button class="ql-script" value="super"></button> -->
+                    </span>
+                </div>
+                <div id="slide_content"></div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

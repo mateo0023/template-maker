@@ -1,0 +1,74 @@
+@font-face {
+    font-family: Celebes;
+    src: url("./fonts/Celebes-Regular.ttf");
+}
+
+@font-face {
+    font-family: Celebes;
+    src: url("./fonts/Celebes-Bold.ttf");
+    font-style: normal;
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: Celebes;
+    src: url("./fonts/Celebes-BoldItalic.ttf");
+    font-style: italic;
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: Celebes;
+    src: url("./fonts/Celebes-Italic.ttf");
+    font-style: italic;
+    font-weight: normal;
+}
+
+.selected {
+    font-weight: bold;
+}
+
+#scrolling-container {
+    width: 375px;
+}
+
+.ql-container {
+    overflow-y: auto;
+}
+
+#slide_content {
+    font-size: 17px;
+    font-family: Celebes;
+    width: 100%;
+    height: 325px;
+}
+
+#slide_content .ql-editor {
+    -ms-overflow-style: none;
+    /* for Internet Explorer, Edge */
+    scrollbar-width: none;
+    /* for Firefox */
+    overflow-y: scroll;
+}
+
+#slide_content .ql-editor::-webkit-scrollbar {
+    display: none;
+    /* for Chrome, Safari, and Opera */
+}
+
+.global-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+}
+
+.global-container>* {
+    flex-basis: 500px;
+    flex: 1 0;
+    margin: 0 auto 0 auto;
+}
+
+#lists_container {
+    padding: 5px;
+}
