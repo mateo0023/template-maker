@@ -66,7 +66,7 @@ const { buffer } = require('sharp/lib/is');
 
     // When you change slide contents
     quill.on('text-change', () => {
-        if(curr_pre_processed_image){
+        if (curr_pre_processed_image) {
             updateSampleImage()
         }
     })
@@ -205,7 +205,7 @@ const { buffer } = require('sharp/lib/is');
     }
 
     function updateSlide() {
-        document.getElementById("selected_image").src = `${path.join(working_path, currentSlide.img.src)}`
+        document.getElementById("selected_image").src = (currentSlide.img.src === '') ? '' : `${path.join(working_path, currentSlide.img.src)}`
         document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
         slide_title.value = currentSlide.title;
         quill.setContents(currentSlide.content);
@@ -271,7 +271,7 @@ const { buffer } = require('sharp/lib/is');
         updateSlidesList(false)
     }
 
-    function makeBaseAndUpdate(){
+    function makeBaseAndUpdate() {
         makeBaseImage(currentSlide, updateSampleImage)
     }
 
@@ -280,7 +280,7 @@ const { buffer } = require('sharp/lib/is');
         const img_out = document.getElementById("sample-output-img")
 
         // Process the new image if complete
-        if (currentSlide.img.src !== '' && (currentSlide.title !== '' || currentSlide.content !== '')) {
+        if (!(currentSlide.title === '' && currentSlide.content === '')) {
             let content_height = 0
             const quill_contents = document.getElementById('slide_content').children[0].children
             for (let i = 0; i < quill_contents.length && quill.getLength() > 1; i++) {
@@ -331,23 +331,24 @@ const { buffer } = require('sharp/lib/is');
                     }
                 })
         } else {
-            img_out.src = ''
+            img_out.src = 'data:image/jpeg;base64,' + base_img.toBuffer().toString('base64');
         }
     }
 
     // Sets the curr_pre_processed_image to the most current values of slide
     // Will call the _callback function with the updated base_lyr
-    async function makeBaseImage(slide = currentSlide, _callback = () => {}, to_file = PRE_PROCESSES_IMAGE, path_to_save) {
-        if (slide.img.src === '') {
+    async function makeBaseImage(slide = currentSlide, _callback = () => { }, to_file = PRE_PROCESSES_IMAGE, path_to_save) {
+        if (slide.img.src === '' || slide.img.src === undefined) {
             curr_pre_processed_image = sharp({
                 create: {
                     width: 1080,
                     height: 1350,
                     channels: 3,
-                    background: { r: 0, g: 0, b: 0 }
+                    background: { r: 29, g: 219, b: 121, }
                 }
-            })
-            return curr_pre_processed_image
+            }).jpeg()
+
+            _callback(curr_pre_processed_image)
         } else {
             const full_image_path = path.join(working_path, slide.img.src)
 
@@ -383,7 +384,7 @@ const { buffer } = require('sharp/lib/is');
                 base_lyr = await base_lyr.jpeg()
             }
 
-            if(slide === currentSlide){
+            if (slide === currentSlide) {
                 curr_pre_processed_image = base_lyr
             }
 
