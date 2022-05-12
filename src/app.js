@@ -21,7 +21,7 @@ app.whenReady().then(() => {
     const createWindwow = () => {
         mainWindow = new BrowserWindow({
             title: "Template Maker",
-            width: 900,
+            width: 1050,
             height: 700,
             minWidth: 700,
             minHeight: 700,
@@ -33,7 +33,7 @@ app.whenReady().then(() => {
             },
         })
 
-        mainWindow.toggleDevTools();
+        // mainWindow.toggleDevTools();
 
         mainWindow.loadFile('./src/main.html')
 

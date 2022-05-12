@@ -71,4 +71,9 @@
 
 #lists_container {
     padding: 5px;
+    min-width: 250px;
+}
+
+#sample-output-img {
+    padding: 10px;
 }

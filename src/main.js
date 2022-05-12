@@ -5,6 +5,7 @@ const { buffer } = require('sharp/lib/is');
     const path = require('path')
     const sharp = require('sharp')
     const AUTO_SAVE = false;
+    const PRE_PROCESSES_IMAGE = false;
 
     sharp.cache(false)
 
@@ -14,6 +15,7 @@ const { buffer } = require('sharp/lib/is');
     var currentArticle;
     var currentSlide;
     var curr_slide_list_item;
+    var curr_pre_processed_image;
 
     var quill = new Quill('#slide_content', {
         modules: {
@@ -62,10 +64,18 @@ const { buffer } = require('sharp/lib/is');
     ipcRenderer.on('move-slide-up', moveSlideUp)
     ipcRenderer.on('move-slide-down', moveSlideDown)
 
+    // When you change slide contents
+    quill.on('text-change', () => {
+        if(curr_pre_processed_image){
+            updateSampleImage()
+        }
+    })
+
     // Title input
     document.getElementById('slide_title').addEventListener('input', (e) => {
         currentSlide.title = e.target.value;
         curr_slide_list_item.innerHTML = (currentSlide.title === '') ? 'No Title' : currentSlide.title
+        makeBaseAndUpdate()
     })
 
     // Title de-focused
@@ -81,6 +91,7 @@ const { buffer } = require('sharp/lib/is');
         ipcRenderer.invoke('select-image').then((result) => {
             currentSlide.img.src = result.rel
             document.getElementById("selected_image").src = result.abs
+            makeBaseImage(currentSlide,)
             updateSlide();
             if (AUTO_SAVE) {
                 saveToFile();
@@ -91,6 +102,7 @@ const { buffer } = require('sharp/lib/is');
     // Invert Image Checkbox
     document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) => {
         currentSlide.img.reverse_fit = e.target.checked
+        makeBaseAndUpdate()
     })
 
     // Remove Slide Button
@@ -120,9 +132,6 @@ const { buffer } = require('sharp/lib/is');
     document.getElementById('move_slide_down').addEventListener('click', () => {
         moveSlideDown()
     })
-
-    // Show the image preview
-    document.getElementById("img-preview-btn").addEventListener('click', updateSampleImage)
 
     function updateArticlesList(update_current = true) {
         let list = document.getElementById("articles_list");
@@ -201,7 +210,7 @@ const { buffer } = require('sharp/lib/is');
         document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
         slide_title.value = currentSlide.title;
         quill.setContents(currentSlide.content);
-        updateSampleImage()
+        makeBaseAndUpdate()
     }
 
     function makeNewArticle() {
@@ -263,51 +272,25 @@ const { buffer } = require('sharp/lib/is');
         updateSlidesList(false)
     }
 
-    async function updateSampleImage() {
+    function makeBaseAndUpdate(){
+        makeBaseImage(currentSlide, updateSampleImage)
+    }
+
+    async function updateSampleImage(base_img = curr_pre_processed_image) {
         const added_txt_padding = 43.2 * 2
         const img_out = document.getElementById("sample-output-img")
 
         // Process the new image if complete
         if (currentSlide.img.src !== '' && (currentSlide.title !== '' || currentSlide.content !== '')) {
-            const full_image_path = path.join(working_path, currentSlide.img.src)
-
-            let base_lyr = await sharp({
-                create: {
-                    width: 1080,
-                    height: 1350,
-                    channels: 3,
-                    background: { r: 255, g: 255, b: 255 }
-                }
-            })
-
             let content_height = 0
             const quill_contents = document.getElementById('slide_content').children[0].children
             for (let i = 0; i < quill_contents.length && quill.getLength() > 1; i++) {
                 content_height += quill_contents[i].clientHeight
             }
             // Convert from HTML px to real pixels
-            content_height *= 2.371900826446281
+            content_height *= 2.371900826446281;
 
-            // Will need to get the image
-            let foreground_img = await sharp(full_image_path)
-            let blurred_img_buf
-            if (currentSlide.img.reverse_fit) {
-                foreground_img = await foreground_img.resize(1080, 1350, { fit: "inside" })
-                blurred_img_buf = sharp(full_image_path).resize(1080, 1350).blur(15).toBuffer()
-
-            } else {
-                foreground_img = await foreground_img.resize(1080, 1350, { fit: "outside" })
-            }
-
-            base_lyr.composite([
-                // Add the blurred background only if necessary
-                ...((currentSlide.img.reverse_fit) ? [{ input: await blurred_img_buf, top: 0, left: 0 }] : []),
-                // Background Image
-                {
-                    input: await foreground_img.toBuffer(),
-                    top: Math.round((1350 - (await foreground_img.metadata()).height) / 2),
-                    left: 0
-                },
+            sharp(await base_img.toBuffer()).composite([
                 // Create content box only if there's content
                 ...((content_height > 0) ?
 
@@ -317,7 +300,7 @@ const { buffer } = require('sharp/lib/is');
                                 width: 993,
                                 height: Math.round(content_height + added_txt_padding),
                                 channels: 4,
-                                background: { r: 44, g: 109, b: 195, alpha: 0.62 } // 62% filled
+                                background: { r: 44, g: 109, b: 195, alpha: 0.62 }
                             }
                         }).png().toBuffer(),
                         top: Math.round(1350 - content_height - added_txt_padding - 47),
@@ -333,22 +316,94 @@ const { buffer } = require('sharp/lib/is');
                                 // Roughly 27 chars per line, 60 pixels per line
                                 height: Math.round(Math.ceil(currentSlide.title.length / 27) * 60 + added_txt_padding),
                                 channels: 4,
-                                background: { r: 44, g: 109, b: 195, alpha: 0.9 }
+                                background: { r: 44, g: 109, b: 195, alpha: 0.62 }
                             }
                         }).png().toBuffer(),
                         top: 47,
                         left: 47
                     }] : [])
-            ]).jpeg().toBuffer((e, buf, info) => {
-                if (e) {
-                    console.log(e)
-                    img_out.src = ''
-                } else {
-                    img_out.src = 'data:image/jpeg;base64,' + buf.toString('base64');
-                }
-            })
+            ])
+                .jpeg().toBuffer((e, buf, info) => {
+                    if (e) {
+                        console.log(e)
+                        img_out.src = ''
+                    } else {
+                        img_out.src = 'data:image/jpeg;base64,' + buf.toString('base64');
+                    }
+                })
         } else {
             img_out.src = ''
+        }
+    }
+
+    // Sets the curr_pre_processed_image to the most current values of slide
+    // Will call the _callback function with the updated base_lyr
+    async function makeBaseImage(slide = currentSlide, _callback = () => {}, to_file = PRE_PROCESSES_IMAGE, path_to_save) {
+        if (slide.img.src === '') {
+            curr_pre_processed_image = sharp({
+                create: {
+                    width: 1080,
+                    height: 1350,
+                    channels: 3,
+                    background: { r: 0, g: 0, b: 0 }
+                }
+            })
+            return curr_pre_processed_image
+        } else {
+            const full_image_path = path.join(working_path, slide.img.src)
+
+            const foreground_img = await sharp(full_image_path)
+                .resize(1080, 1350, { fit: (slide.img.reverse_fit) ? "inside" : "cover" })
+
+            let base_lyr = sharp({
+                create: {
+                    width: 1080,
+                    height: 1350,
+                    channels: 3,
+                    background: { r: 0, g: 0, b: 0 }
+                }
+            }).composite([
+                // Add the blurred background only if necessary
+                ...((slide.img.reverse_fit) ?
+                    [{
+                        input: await (sharp(full_image_path).resize(1080, 1350, { fit: "cover" }).blur(20).toBuffer()),
+                        top: 0,
+                        left: 0
+                    }]
+                    : []),
+                // Background Image
+                {
+                    input: await foreground_img.toBuffer(),
+                    top: (slide.img.reverse_fit) ? Math.round((1350 - (await foreground_img.metadata()).height) / 2) : 0,
+                    left: 0
+                }])
+
+            if (path.extname(slide.img.src) === '.png') {
+                base_lyr = await base_lyr.png()
+            } else if (path.extname(slide.img.src) === '.jpeg' || path.extname(slide.img.src) === '.jpg') {
+                base_lyr = await base_lyr.jpeg()
+            }
+
+            if(slide === currentSlide){
+                curr_pre_processed_image = base_lyr
+            }
+
+            if (to_file && path_to_save) {
+                base_lyr.toFile(path_to_save)
+
+                slide.img.pre_processed_path = path.relative(working_path, path_to_save)
+            } else if (to_file) {
+                let pre_processed_img_path = full_image_path.split('.')
+                pre_processed_img_path[pre_processed_img_path.length - 2] += '_pre-processed'
+                pre_processed_img_path = pre_processed_img_path.join('.')
+                base_lyr.toFile(pre_processed_img_path)
+
+                slide.img.pre_processed_path = path.relative(working_path, pre_processed_img_path)
+            } else {
+                slide.img.pre_processed_path = ''
+            }
+
+            _callback(base_lyr)
         }
     }
 
@@ -365,7 +420,7 @@ const { buffer } = require('sharp/lib/is');
     }
 
     function createSlideObj() {
-        return { title: "", content: {}, img: { src: "", reverse_fit: false } }
+        return { title: "", content: {}, img: { src: "", reverse_fit: false, pre_processed_path: '' } }
     }
 
     function clearChildren(el) {
