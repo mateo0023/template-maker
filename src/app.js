@@ -33,7 +33,7 @@ app.whenReady().then(() => {
             },
         })
 
-        // mainWindow.toggleDevTools();
+        mainWindow.toggleDevTools();
 
         mainWindow.loadFile('./src/main.html')
 

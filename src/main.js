@@ -1,24 +1,25 @@
+const { buffer } = require('sharp/lib/is');
+
 (() => {
-    const { ipcRenderer } = require('electron');
+    const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
+    const sharp = require('sharp')
     const AUTO_SAVE = false;
+
+    sharp.cache(false)
 
     // Main data object
     var mainData;
     var working_path;
     var currentArticle;
+    var currentSlide;
     var curr_slide_list_item;
 
     var quill = new Quill('#slide_content', {
         modules: {
             toolbar: "#toolbar"
-            // toolbar: [
-            //     ['bold', 'italic'],
-            //     [{ 'list': 'bullet' }]
-            // ]
         },
         placeholder: 'Enter the contents of the slide',
-        // scrollingContainer: "#scrolling-container",
         theme: 'snow'
     });
 
@@ -54,12 +55,12 @@
         updateArticlesList(false);
     })
 
-    ipcRenderer.on('make-article',      makeNewArticle)
-    ipcRenderer.on('remove-article',    removeArticle)
-    ipcRenderer.on('make-slide',        makeNewSlide)
-    ipcRenderer.on('remove-slide',      removeSlide)
-    ipcRenderer.on('move-slide-up',     moveSlideUp)
-    ipcRenderer.on('move-slide-down',   moveSlideDown)
+    ipcRenderer.on('make-article', makeNewArticle)
+    ipcRenderer.on('remove-article', removeArticle)
+    ipcRenderer.on('make-slide', makeNewSlide)
+    ipcRenderer.on('remove-slide', removeSlide)
+    ipcRenderer.on('move-slide-up', moveSlideUp)
+    ipcRenderer.on('move-slide-down', moveSlideDown)
 
     // Title input
     document.getElementById('slide_title').addEventListener('input', (e) => {
@@ -119,6 +120,9 @@
     document.getElementById('move_slide_down').addEventListener('click', () => {
         moveSlideDown()
     })
+
+    // Show the image preview
+    document.getElementById("img-preview-btn").addEventListener('click', updateSampleImage)
 
     function updateArticlesList(update_current = true) {
         let list = document.getElementById("articles_list");
@@ -182,7 +186,7 @@
                 updateSlide();
             })
 
-            if (currentArticle.slides[i] === currentSlide){
+            if (currentArticle.slides[i] === currentSlide) {
                 curr_slide_list_item = new_it
                 new_it.classList.add('selected')
             }
@@ -197,6 +201,7 @@
         document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
         slide_title.value = currentSlide.title;
         quill.setContents(currentSlide.content);
+        updateSampleImage()
     }
 
     function makeNewArticle() {
@@ -205,7 +210,7 @@
         ipcRenderer.send('ask-title')
     }
 
-    function removeArticle(){
+    function removeArticle() {
         removeItemFromArr(mainData.articles, currentArticle)
 
         // It already makes new Article if needed
@@ -222,7 +227,7 @@
         updateSlidesList(false);
     }
 
-    function removeSlide(){
+    function removeSlide() {
         removeItemFromArr(currentArticle.slides, currentSlide)
         if (currentArticle.slides.length === 0) {
             removeItemFromArr(mainData.articles, currentArticle)
@@ -234,7 +239,7 @@
         }
     }
 
-    function moveSlideUp(){
+    function moveSlideUp() {
         saveProgressToObj()
 
         let old_idx = currentArticle.slides.indexOf(currentSlide)
@@ -256,6 +261,95 @@
         }
 
         updateSlidesList(false)
+    }
+
+    async function updateSampleImage() {
+        const added_txt_padding = 43.2 * 2
+        const img_out = document.getElementById("sample-output-img")
+
+        // Process the new image if complete
+        if (currentSlide.img.src !== '' && (currentSlide.title !== '' || currentSlide.content !== '')) {
+            const full_image_path = path.join(working_path, currentSlide.img.src)
+
+            let base_lyr = await sharp({
+                create: {
+                    width: 1080,
+                    height: 1350,
+                    channels: 3,
+                    background: { r: 255, g: 255, b: 255 }
+                }
+            })
+
+            let content_height = 0
+            const quill_contents = document.getElementById('slide_content').children[0].children
+            for (let i = 0; i < quill_contents.length && quill.getLength() > 1; i++) {
+                content_height += quill_contents[i].clientHeight
+            }
+            // Convert from HTML px to real pixels
+            content_height *= 2.371900826446281
+
+            // Will need to get the image
+            let foreground_img = await sharp(full_image_path)
+            let blurred_img_buf
+            if (currentSlide.img.reverse_fit) {
+                foreground_img = await foreground_img.resize(1080, 1350, { fit: "inside" })
+                blurred_img_buf = sharp(full_image_path).resize(1080, 1350).blur(15).toBuffer()
+
+            } else {
+                foreground_img = await foreground_img.resize(1080, 1350, { fit: "outside" })
+            }
+
+            base_lyr.composite([
+                // Add the blurred background only if necessary
+                ...((currentSlide.img.reverse_fit) ? [{ input: await blurred_img_buf, top: 0, left: 0 }] : []),
+                // Background Image
+                {
+                    input: await foreground_img.toBuffer(),
+                    top: Math.round((1350 - (await foreground_img.metadata()).height) / 2),
+                    left: 0
+                },
+                // Create content box only if there's content
+                ...((content_height > 0) ?
+
+                    [{
+                        input: await sharp({
+                            create: {
+                                width: 993,
+                                height: Math.round(content_height + added_txt_padding),
+                                channels: 4,
+                                background: { r: 44, g: 109, b: 195, alpha: 0.62 } // 62% filled
+                            }
+                        }).png().toBuffer(),
+                        top: Math.round(1350 - content_height - added_txt_padding - 47),
+                        left: 47
+                    }] : []
+                ),
+                // Create title box only if there's a title
+                ...((currentSlide.title.length > 0) ?
+                    [{
+                        input: await sharp({
+                            create: {
+                                width: 993,
+                                // Roughly 27 chars per line, 60 pixels per line
+                                height: Math.round(Math.ceil(currentSlide.title.length / 27) * 60 + added_txt_padding),
+                                channels: 4,
+                                background: { r: 44, g: 109, b: 195, alpha: 0.9 }
+                            }
+                        }).png().toBuffer(),
+                        top: 47,
+                        left: 47
+                    }] : [])
+            ]).jpeg().toBuffer((e, buf, info) => {
+                if (e) {
+                    console.log(e)
+                    img_out.src = ''
+                } else {
+                    img_out.src = 'data:image/jpeg;base64,' + buf.toString('base64');
+                }
+            })
+        } else {
+            img_out.src = ''
+        }
     }
 
     function saveProgressToObj() {
