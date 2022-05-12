@@ -102,6 +102,9 @@ const { buffer } = require('sharp/lib/is');
     document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) => {
         currentSlide.img.reverse_fit = e.target.checked
         makeBaseAndUpdate()
+        if (AUTO_SAVE) {
+            saveToFile();
+        }
     })
 
     // Remove Slide Button
@@ -233,6 +236,9 @@ const { buffer } = require('sharp/lib/is');
         currentSlide = new_slide
 
         updateSlidesList(false);
+        if (AUTO_SAVE) {
+            saveToFile();
+        }
     }
 
     function removeSlide() {
