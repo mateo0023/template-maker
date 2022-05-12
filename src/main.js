@@ -91,8 +91,7 @@ const { buffer } = require('sharp/lib/is');
         ipcRenderer.invoke('select-image').then((result) => {
             currentSlide.img.src = result.rel
             document.getElementById("selected_image").src = result.abs
-            makeBaseImage(currentSlide,)
-            updateSlide();
+            makeBaseAndUpdate()
             if (AUTO_SAVE) {
                 saveToFile();
             }
