@@ -1,9 +1,9 @@
-const { buffer } = require('sharp/lib/is');
 
 (() => {
     const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
     const sharp = require('sharp')
+    const { buffer } = require('sharp/lib/is');
     const AUTO_SAVE = false;
     const PRE_PROCESSES_IMAGE = false;
 

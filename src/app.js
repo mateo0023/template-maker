@@ -124,31 +124,31 @@ ipcMain.handle('select-image', async () => {
     let new_img_path = img_path
 
     const adjust_img_path = () => {
-        if(!fs.existsSync(path.join(working_path, "src"))){
-            fs.mkdirSync(path.join(working_path, "src"), {recursive: true})
+        if (!fs.existsSync(path.join(working_path, "src"))) {
+            fs.mkdirSync(path.join(working_path, "src"), { recursive: true })
         }
         new_img_path = path.join(working_path, 'src', image_name)
     }
 
-    if (meta.format === 'webp') {
+    if (relative_path.startsWith('..')) {
         adjust_img_path()
+    }
+    if (meta.format === 'webp') {
         new_img_path = new_img_path.replace('.webp', '.jpeg')
         await img.resize(1080, 1350, { fit: "outside" }).toFile(new_img_path)
-        fs.rm(img_path, (e) => {if(e) console.log(e)})
+        fs.rm(img_path, (e) => { if (e) console.log(e) })
     } else if (meta.width > 1080 && meta.height > 1350) {
-        adjust_img_path()
-        console.log("renaming")
-        // Only add the _s to the file name if it doesn't exist inside ./src
-        if(fs.existsSync(new_img_path)){
+        // Only add the _s to the file name if it doesn't exist in the same directory 
+        // because sharp cannot overwrite to the same file
+        if (fs.existsSync(new_img_path) && new_img_path === img_path) {
             new_img_path = new_img_path.split('.')
             new_img_path[new_img_path.length - 2] = new_img_path[new_img_path.length - 2] + '_s'
             new_img_path = new_img_path.join('.')
         }
 
         await img.resize(1080, 1350, { fit: "outside" }).toFile(new_img_path)
-        fs.rm(img_path, (e) => {if(e) console.log(e)})
+        fs.rm(img_path, (e) => { if (e) console.log(e) })
     } else if (relative_path.startsWith('..')) {
-        adjust_img_path()
         fs.renameSync(img_path, new_img_path)
     }
 
