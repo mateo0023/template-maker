@@ -2,8 +2,7 @@
 (() => {
     const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
-    const sharp = require('sharp')
-    const { buffer } = require('sharp/lib/is');
+    const { makeBaseAndUpdate } = require("./image-processing")
     const AUTO_SAVE = false;
     const PRE_PROCESSES_IMAGE = false;
 
@@ -15,7 +14,6 @@
     var currentArticle;
     var currentSlide;
     var curr_slide_list_item;
-    var curr_pre_processed_image;
 
     var quill = new Quill('#slide_content', {
         modules: {
@@ -66,8 +64,8 @@
 
     // When you change slide contents
     quill.on('text-change', () => {
-        if (curr_pre_processed_image) {
-            updateSampleImage()
+        if (currentSlide) {
+            makeBaseAndUpdate(currentSlide)
         }
     })
 
@@ -277,141 +275,6 @@
         updateSlidesList(false)
     }
 
-    function makeBaseAndUpdate() {
-        makeBaseImage(currentSlide, updateSampleImage)
-    }
-
-    async function updateSampleImage(base_img = curr_pre_processed_image) {
-        const added_txt_padding = 43.2 * 2
-        const img_out = document.getElementById("sample-output-img")
-
-        // Process the new image if complete
-        if (!(currentSlide.title === '' && currentSlide.content === '')) {
-            let content_height = 0
-            const quill_contents = document.getElementById('slide_content').children[0].children
-            for (let i = 0; i < quill_contents.length && quill.getLength() > 1; i++) {
-                content_height += quill_contents[i].clientHeight
-            }
-            // Convert from HTML px to real pixels
-            content_height *= 2.371900826446281;
-
-            sharp(await base_img.toBuffer()).composite([
-                // Create content box only if there's content
-                ...((content_height > 0) ?
-
-                    [{
-                        input: await sharp({
-                            create: {
-                                width: 993,
-                                height: Math.round(content_height + added_txt_padding),
-                                channels: 4,
-                                background: { r: 44, g: 109, b: 195, alpha: 0.62 }
-                            }
-                        }).png().toBuffer(),
-                        top: Math.round(1350 - content_height - added_txt_padding - 47),
-                        left: 47
-                    }] : []
-                ),
-                // Create title box only if there's a title
-                ...((currentSlide.title.length > 0) ?
-                    [{
-                        input: await sharp({
-                            create: {
-                                width: 993,
-                                // Roughly 27 chars per line, 60 pixels per line
-                                height: Math.round(Math.ceil(currentSlide.title.length / 27) * 60 + added_txt_padding),
-                                channels: 4,
-                                background: { r: 44, g: 109, b: 195, alpha: 0.62 }
-                            }
-                        }).png().toBuffer(),
-                        top: 47,
-                        left: 47
-                    }] : [])
-            ])
-                .jpeg().toBuffer((e, buf, info) => {
-                    if (e) {
-                        console.log(e)
-                        img_out.src = ''
-                    } else {
-                        img_out.src = 'data:image/jpeg;base64,' + buf.toString('base64');
-                    }
-                })
-        } else {
-            img_out.src = 'data:image/jpeg;base64,' + base_img.toBuffer().toString('base64');
-        }
-    }
-
-    // Sets the curr_pre_processed_image to the most current values of slide
-    // Will call the _callback function with the updated base_lyr
-    async function makeBaseImage(slide = currentSlide, _callback = () => { }, to_file = PRE_PROCESSES_IMAGE, path_to_save) {
-        if (slide.img.src === '' || slide.img.src === undefined) {
-            curr_pre_processed_image = sharp({
-                create: {
-                    width: 1080,
-                    height: 1350,
-                    channels: 3,
-                    background: { r: 29, g: 219, b: 121, }
-                }
-            }).jpeg()
-
-            _callback(curr_pre_processed_image)
-        } else {
-            const full_image_path = path.join(working_path, slide.img.src)
-
-            const foreground_img = await sharp(full_image_path)
-                .resize(1080, 1350, { fit: (slide.img.reverse_fit) ? "inside" : "cover" })
-
-            let base_lyr = sharp({
-                create: {
-                    width: 1080,
-                    height: 1350,
-                    channels: 3,
-                    background: { r: 0, g: 0, b: 0 }
-                }
-            }).composite([
-                // Add the blurred background only if necessary
-                ...((slide.img.reverse_fit) ?
-                    [{
-                        input: await (sharp(full_image_path).resize(1080, 1350, { fit: "cover" }).blur(20).toBuffer()),
-                        top: 0,
-                        left: 0
-                    }]
-                    : []),
-                // Background Image
-                {
-                    input: await foreground_img.toBuffer(),
-                    top: (slide.img.reverse_fit) ? Math.round((1350 - (await foreground_img.metadata()).height) / 2) : 0,
-                    left: 0
-                }])
-
-            if (path.extname(slide.img.src) === '.png') {
-                base_lyr = await base_lyr.png()
-            } else if (path.extname(slide.img.src) === '.jpeg' || path.extname(slide.img.src) === '.jpg') {
-                base_lyr = await base_lyr.jpeg()
-            }
-
-            if (slide === currentSlide) {
-                curr_pre_processed_image = base_lyr
-            }
-
-            if (to_file && path_to_save) {
-                base_lyr.toFile(path_to_save)
-
-                slide.img.pre_processed_path = path.relative(working_path, path_to_save)
-            } else if (to_file) {
-                let pre_processed_img_path = full_image_path.split('.')
-                pre_processed_img_path[pre_processed_img_path.length - 2] += '_pre-processed'
-                pre_processed_img_path = pre_processed_img_path.join('.')
-                base_lyr.toFile(pre_processed_img_path)
-
-                slide.img.pre_processed_path = path.relative(working_path, pre_processed_img_path)
-            } else {
-                slide.img.pre_processed_path = ''
-            }
-
-            _callback(base_lyr)
-        }
-    }
 
     function saveProgressToObj() {
         // The slide content is handled by quill

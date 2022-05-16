@@ -1,6 +1,6 @@
 {
   "name": "template-maker",
-  "version": "1.1.1",
+  "version": "1.2.0b",
   "description": "Template Maker",
   "main": "./src/app.js",
   "icon": "./assets/SolveIt-Logo.ico",
