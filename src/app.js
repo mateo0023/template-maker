@@ -111,7 +111,7 @@ ipcMain.handle('select-image', async () => {
     if (img_path === undefined)
         return { rel: '', abs: '' }
     else
-        img_path = `${img_path}`
+        img_path = img_path[0]
 
     let relative_path = `${path.relative(working_path, img_path)}`
     let image_name = path.basename(img_path)
@@ -130,7 +130,8 @@ ipcMain.handle('select-image', async () => {
         new_img_path = path.join(working_path, 'src', image_name)
     }
 
-    if (relative_path.startsWith('..')) {
+    // If it's not on a sub-folder or it's in another disk (relative path needs to be absolute path)
+    if (relative_path.startsWith('..') || relative_path === img_path) {
         adjust_img_path()
     }
     if (meta.format === 'webp') {
@@ -148,11 +149,16 @@ ipcMain.handle('select-image', async () => {
 
         await img.resize(1080, 1350, { fit: "outside" }).toFile(new_img_path)
         fs.rm(img_path, (e) => { if (e) console.log(e) })
-    } else if (relative_path.startsWith('..')) {
+    } else if (relative_path.startsWith('..')){
+        // If it's not on a sub-folder
         fs.renameSync(img_path, new_img_path)
+    } else if (relative_path === img_path) {
+        // It's in another disk (relative path === absolute path)
+        // Need to copy and then delete old file, otherwise not allowed
+        fs.copyFileSync(img_path, new_img_path)
+        fs.rm(img_path, e => { if(e) console.log(e); })
     }
 
-    console.log(`About to return ${path.relative(working_path, new_img_path)}`)
     return { rel: `${path.relative(working_path, new_img_path)}`, abs: `${new_img_path}` }
 })
 
