@@ -2,7 +2,7 @@
 (() => {
     const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
-    const { makeBaseImage, updateSampleImage } = require("./image-processing")
+    const { makeBaseImage, updateSampleImage, makeFullImage } = require("./image-processing")
     const AUTO_SAVE = false;
     const PRE_PROCESSES_IMAGE = false;
 
@@ -24,6 +24,17 @@
     const makeBaseAndUpdate = () => {
         makeBaseImage(currentSlide, working_path, (buff) => { updateSampleImage(currentSlide, buff, quill) })
     }
+
+    // ******************************************************
+    // ******************************************************
+    // ***************** ONLY FOR DEBUGGING *****************
+    // ******************************************************
+    // ******************************************************
+    document.getElementById("update-image").addEventListener('click', () => {
+        makeBaseImage(currentSlide, working_path, (buff) => {
+            makeFullImage(buff, quill, currentSlide)
+        })
+    })
 
     ipcRenderer.on('file:opened', (e, data, path) => {
         document.querySelector('body').hidden = false;

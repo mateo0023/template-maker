@@ -1,8 +1,11 @@
 
 const sharp = require('sharp')
 const path = require('path')
+const fabric = require("fabric").fabric
 
 sharp.cache(false)
+
+const CORNER_RADIUS = 43.2;
 
 async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
     const added_txt_padding = 43.2 * 2
@@ -65,16 +68,43 @@ async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
 }
 
 // This should use the Canvas API to add the text to the pre_processed buffer
-function makeFullImage(slide_obj, image_buffer, file_path=null) {
+function makeFullImage(buffer, quill_obj, slide_obj) {
+    const canvas = new fabric.Canvas('output-img');
+    const added_txt_padding = 43.2 * 2
 
+    let content_height = 0
+    const quill_contents = document.getElementById('slide_content').children[0].children
+    for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
+        content_height += quill_contents[i].clientHeight
+    }
+    // Convert from HTML px to real pixels
+    content_height *= 2.371900826446281;
+
+    fabric.Image.fromURL('data:image/jpeg;base64,' + buffer.toString('base64'), (img) => {
+        canvas.add(img)
+        canvas.add(makeRect(47, 47, 993, Math.round(Math.ceil(slide_obj.title.length / 27) * 60 + added_txt_padding)));
+        canvas.add(makeRect(47, Math.round(1350 - content_height - added_txt_padding - 47), 993, Math.round(content_height + added_txt_padding)));
+    })
+}
+
+function makeRect(x, y, width, height) {
+    return new fabric.Rect({
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+        fill: "rgba(44, 109, 195, 0.62)",
+        rx: CORNER_RADIUS,
+        ry: CORNER_RADIUS
+    });
 }
 
 // Sets the curr_pre_processed_image to the most current values of slide
 // Will call the _callback function with the updated base_lyr
-async function makeBaseImage(slide, working_path, _callback = () => {}) {
+async function makeBaseImage(slide, working_path, _callback = () => { }) {
     if (slide.img.src === '' || slide.img.src === undefined) {
         // Make the callback to the object
-        _callback( 
+        _callback(
             await sharp({
                 create: {
                     width: 1080,
@@ -141,5 +171,5 @@ async function makeBaseImage(slide, working_path, _callback = () => {}) {
 module.exports = {
     updateSampleImage,
     makeBaseImage,
-    // makeFullImage
+    makeFullImage
 }
