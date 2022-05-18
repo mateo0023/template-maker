@@ -1,12 +1,10 @@
 
 const sharp = require('sharp')
-// const { buffer } = require('sharp/lib/is');
+const path = require('path')
 
-function makeBaseAndUpdate(slide_obj) {
-    makeBaseImage(slide_obj, updateSampleImage)
-}
+sharp.cache(false)
 
-async function updateSampleImage(slide_obj, base_img) {
+async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
     const added_txt_padding = 43.2 * 2
     const img_out = document.getElementById("sample-output-img")
 
@@ -14,13 +12,13 @@ async function updateSampleImage(slide_obj, base_img) {
     if (!(slide_obj.title === '' && slide_obj.content === '')) {
         let content_height = 0
         const quill_contents = document.getElementById('slide_content').children[0].children
-        for (let i = 0; i < quill_contents.length && quill.getLength() > 1; i++) {
+        for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
             content_height += quill_contents[i].clientHeight
         }
         // Convert from HTML px to real pixels
         content_height *= 2.371900826446281;
 
-        sharp(await base_img.toBuffer()).composite([
+        sharp(base_img_buff).composite([
             // Create content box only if there's content
             ...((content_height > 0) ?
 
@@ -53,16 +51,16 @@ async function updateSampleImage(slide_obj, base_img) {
                     left: 47
                 }] : [])
         ])
-            .jpeg().toBuffer((e, buf, info) => {
+            .jpeg().toBuffer((e, buff, info) => {
                 if (e) {
                     console.log(e)
                     img_out.src = ''
                 } else {
-                    img_out.src = 'data:image/jpeg;base64,' + buf.toString('base64');
+                    img_out.src = 'data:image/jpeg;base64,' + buff.toString('base64');
                 }
             })
     } else {
-        img_out.src = 'data:image/jpeg;base64,' + base_img.toBuffer().toString('base64');
+        img_out.src = 'data:image/jpeg;base64,' + base_img_buff.toBuffer().toString('base64');
     }
 }
 
@@ -73,18 +71,18 @@ function makeFullImage(slide_obj, image_buffer, file_path=null) {
 
 // Sets the curr_pre_processed_image to the most current values of slide
 // Will call the _callback function with the updated base_lyr
-async function makeBaseImage(slide, _callback = () => {}, to_file = PRE_PROCESSES_IMAGE, path_to_save) {
+async function makeBaseImage(slide, working_path, _callback = () => {}) {
     if (slide.img.src === '' || slide.img.src === undefined) {
         // Make the callback to the object
-        _callback(slide, 
-            sharp({
+        _callback( 
+            await sharp({
                 create: {
                     width: 1080,
                     height: 1350,
                     channels: 3,
                     background: { r: 29, g: 219, b: 121, }
                 }
-            }).jpeg()
+            }).jpeg().toBuffer()
         )
     } else {
         const full_image_path = path.join(working_path, slide.img.src)
@@ -121,27 +119,27 @@ async function makeBaseImage(slide, _callback = () => {}, to_file = PRE_PROCESSE
             base_lyr = await base_lyr.jpeg()
         }
 
-        if (to_file && path_to_save) {
-            base_lyr.toFile(path_to_save)
+        // if (to_file && path_to_save) {
+        //     base_lyr.toFile(path_to_save)
 
-            slide.img.pre_processed_path = path.relative(working_path, path_to_save)
-        } else if (to_file) {
-            let pre_processed_img_path = full_image_path.split('.')
-            pre_processed_img_path[pre_processed_img_path.length - 2] += '_pre-processed'
-            pre_processed_img_path = pre_processed_img_path.join('.')
-            base_lyr.toFile(pre_processed_img_path)
+        //     slide.img.pre_processed_path = path.relative(working_path, path_to_save)
+        // } else if (to_file) {
+        //     let pre_processed_img_path = full_image_path.split('.')
+        //     pre_processed_img_path[pre_processed_img_path.length - 2] += '_pre-processed'
+        //     pre_processed_img_path = pre_processed_img_path.join('.')
+        //     base_lyr.toFile(pre_processed_img_path)
 
-            slide.img.pre_processed_path = path.relative(working_path, pre_processed_img_path)
-        } else {
-            slide.img.pre_processed_path = ''
-        }
+        //     slide.img.pre_processed_path = path.relative(working_path, pre_processed_img_path)
+        // } else {
+        //     slide.img.pre_processed_path = ''
+        // }
 
-        _callback(slide, base_lyr)
+        _callback(await base_lyr.toBuffer())
     }
 }
 
 module.exports = {
-    makeBaseAndUpdate,
+    updateSampleImage,
     makeBaseImage,
-    makeFullImage
+    // makeFullImage
 }

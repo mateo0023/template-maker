@@ -2,11 +2,9 @@
 (() => {
     const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
-    const { makeBaseAndUpdate } = require("./image-processing")
+    const { makeBaseImage, updateSampleImage } = require("./image-processing")
     const AUTO_SAVE = false;
     const PRE_PROCESSES_IMAGE = false;
-
-    sharp.cache(false)
 
     // Main data object
     var mainData;
@@ -23,6 +21,9 @@
         theme: 'snow'
     });
 
+    const makeBaseAndUpdate = () => {
+        makeBaseImage(currentSlide, working_path, (buff) => { updateSampleImage(currentSlide, buff, quill) })
+    }
 
     ipcRenderer.on('file:opened', (e, data, path) => {
         document.querySelector('body').hidden = false;
@@ -65,7 +66,7 @@
     // When you change slide contents
     quill.on('text-change', () => {
         if (currentSlide) {
-            makeBaseAndUpdate(currentSlide)
+            makeBaseAndUpdate()
         }
     })
 

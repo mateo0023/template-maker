@@ -33,9 +33,10 @@ app.whenReady().then(() => {
             },
         })
 
-        // mainWindow.toggleDevTools();
+        mainWindow.toggleDevTools();
+        mainWindow.once("ready-to-show", () => {openFile("D:\\Users\\matab\\Pictures\\SolveIt News\\news\\6qgod1wv")})
 
-        mainWindow.loadFile('./src/main.html')
+        mainWindow.loadFile('./src/image-preview.html')
 
         // Kill the app when main Window closed
         mainWindow.on('closed', function () {
@@ -298,17 +299,19 @@ function sendDataRequest() {
 }
 
 // Open a folder and create collection.json if needed (else load it)
-function openFile(default_path = working_path) {
-    var new_path = dialog.showOpenDialogSync({
-        title: "Select an folder",
-        properties: [
-            'openDirectory'
-        ],
-        defaultPath: default_path
-    })
-    if (new_path != undefined) {
-        working_path = `${new_path}`
-        working_file = `${path.join(working_path, "collection.json")}`
+function openFile(path_to_open = undefined) {
+    if(path_to_open == undefined){
+        path_to_open = dialog.showOpenDialogSync({
+            title: "Select an folder",
+            properties: [
+                'openDirectory'
+            ],
+            defaultPath: working_path
+        })[0]
+    }
+    if (path_to_open != undefined) {
+        working_path = (path.extname(path_to_open) === '') ? path_to_open : path.dirname(path_to_open)
+        working_file = (path.extname(path_to_open) === '.json') ? path_to_open : path.join(working_path, "collection.json")
         fs.readFile(working_file, { encoding: 'utf16le' }, (err, data) => {
             if (err) {
                 let data = emptyCollectionObj();
