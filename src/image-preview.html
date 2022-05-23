@@ -7,7 +7,8 @@
     <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'">
 
     <link href="./quill/quill.snow.css" rel="stylesheet">
-    <link href="main.css" rel="stylesheet" />
+    <link rel="preload" as="font" href="fonts.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="main.css" />
 
     <script defer type="module" src="./quill/quill.js"></script>
     <script defer type="module" src="./quill/quill.min.js"></script>
@@ -64,8 +65,8 @@
                         <button type="button" class="ql-italic"></button>
                         <button type="button" class="ql-list" value="bullet"></button>
 
-                        <!-- <button class="ql-script" value="sub"></button> -->
-                        <!-- <button class="ql-script" value="super"></button> -->
+                        <button class="ql-script" value="sub"></button>
+                        <button class="ql-script" value="super"></button>
                     </span>
                 </div>
                 <div id="slide_content"></div>

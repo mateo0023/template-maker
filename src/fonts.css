@@ -1,0 +1,25 @@
+@font-face {
+    font-family: "Celebes";
+    src: url("./fonts/Celebes-Regular.ttf");
+}
+
+@font-face {
+    font-family: "Celebes";
+    src: url("./fonts/Celebes-Bold.ttf");
+    font-style: normal;
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: "Celebes";
+    src: url("./fonts/Celebes-BoldItalic.ttf");
+    font-style: italic;
+    font-weight: bold;
+}
+
+@font-face {
+    font-family: "Celebes";
+    src: url("./fonts/Celebes-Italic.ttf");
+    font-style: italic;
+    font-weight: normal;
+}

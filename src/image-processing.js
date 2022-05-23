@@ -1,6 +1,6 @@
 
 const sharp = require('sharp')
-const path = require('path')
+const path = require('path');
 const fabric = require("fabric").fabric
 
 sharp.cache(false)
@@ -13,13 +13,14 @@ async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
 
     // Process the new image if complete
     if (!(slide_obj.title === '' && slide_obj.content === '')) {
-        let content_height = 0
-        const quill_contents = document.getElementById('slide_content').children[0].children
-        for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
-            content_height += quill_contents[i].clientHeight
-        }
-        // Convert from HTML px to real pixels
-        content_height *= 2.371900826446281;
+        // let content_height = 0
+        // const quill_contents = document.getElementById('slide_content').children[0].children
+        // for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
+        //     content_height += quill_contents[i].clientHeight
+        // }
+        // Multiplication is to convert from HTML px to real pixels
+        let content_height = (quill_obj.getLength() > 1) ? quill_obj.getBounds(0, quill_obj.getLength()).height * 2.371900826446281 : 0;
+        // content_height *= 2.371900826446281;
 
         sharp(base_img_buff).composite([
             // Create content box only if there's content
@@ -72,31 +73,18 @@ function makeFullImage(buffer, quill_obj, slide_obj) {
     const canvas = new fabric.Canvas('output-img');
     const added_txt_padding = 43.2 * 2
 
-    let content_height = 0
-    const quill_contents = document.getElementById('slide_content').children[0].children
-    for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
-        content_height += quill_contents[i].clientHeight
-    }
-    // Convert from HTML px to real pixels
-    content_height *= 2.371900826446281;
+    // Multiplication is to convert from HTML px to real pixels
+    let content_height = (quill_obj.getLength() > 1) ? quill_obj.getBounds(0, quill_obj.getLength()).height * 2.371900826446281 : 0;
 
     fabric.Image.fromURL('data:image/jpeg;base64,' + buffer.toString('base64'), (img) => {
         canvas.add(img)
-        canvas.add(makeRect(47, 47, 993, Math.round(Math.ceil(slide_obj.title.length / 27) * 60 + added_txt_padding)));
-        canvas.add(makeRect(47, Math.round(1350 - content_height - added_txt_padding - 47), 993, Math.round(content_height + added_txt_padding)));
-    })
-}
+        canvas.add(fabricMakeRect(47, 47, 993, Math.round(Math.ceil(slide_obj.title.length / 27) * 60 + added_txt_padding)));
+        canvas.add(fabricMakeRect(47, Math.round(1350 - content_height - added_txt_padding - 47), 993, Math.round(content_height + added_txt_padding)));
+        canvas.add(fabricMakeTitleText(slide_obj.title))
+        canvas.add(fabricMakeContentText(quill_obj.getText(), content_height))
 
-function makeRect(x, y, width, height) {
-    return new fabric.Rect({
-        left: x,
-        top: y,
-        width: width,
-        height: height,
-        fill: "rgba(44, 109, 195, 0.62)",
-        rx: CORNER_RADIUS,
-        ry: CORNER_RADIUS
-    });
+        // canvas.requestRenderAll()
+    })
 }
 
 // Sets the curr_pre_processed_image to the most current values of slide
@@ -117,8 +105,7 @@ async function makeBaseImage(slide, working_path, _callback = () => { }) {
     } else {
         const full_image_path = path.join(working_path, slide.img.src)
 
-        const foreground_img = await sharp(full_image_path)
-            .resize(1080, 1350, { fit: (slide.img.reverse_fit) ? "inside" : "cover" })
+        const foreground_img = await getSharpImage(full_image_path, slide.img.reverse_fit)
 
         let base_lyr = sharp({
             create: {
@@ -131,7 +118,7 @@ async function makeBaseImage(slide, working_path, _callback = () => { }) {
             // Add the blurred background only if necessary
             ...((slide.img.reverse_fit) ?
                 [{
-                    input: await (sharp(full_image_path).resize(1080, 1350, { fit: "cover" }).blur(20).toBuffer()),
+                    input: await getSharpBlurredBuffer(full_image_path),
                     top: 0,
                     left: 0
                 }]
@@ -166,6 +153,86 @@ async function makeBaseImage(slide, working_path, _callback = () => { }) {
 
         _callback(await base_lyr.toBuffer())
     }
+}
+
+// **********************************************************************
+// **********************************************************************
+// *********************** Sharp Helper Functions ***********************
+// **********************************************************************
+// **********************************************************************
+
+function getSharpBlurredBuffer(image_path) {
+    return sharp(image_path).resize(1080, 1350, { fit: "cover" }).blur(20).toBuffer()
+}
+
+function getSharpImage(image_path, reverse_fit = false) {
+    return sharp(image_path)
+        .resize(1080, 1350, { fit: (reverse_fit) ? "inside" : "cover" })
+}
+
+function getSharpImageBuffer(image_path, reverse_fit = false) {
+    return getSharpImage(image_path, reverse_fit).toBuffer()
+}
+
+
+// ***********************************************************************
+// ***********************************************************************
+// *********************** Fabric Helper Functions ***********************
+// ***********************************************************************
+// ***********************************************************************
+
+// Makes the rounded-corner blue rectangle
+function fabricMakeRect(x, y, width, height) {
+    return new fabric.Rect({
+        left: x,
+        top: y,
+        width: width,
+        height: height,
+        fill: "rgba(44, 109, 195, 0.62)",
+        rx: CORNER_RADIUS,
+        ry: CORNER_RADIUS
+    });
+}
+
+function fabricMakeTitleText(text) {
+    return new fabric.Textbox(text, {
+        // Will need to adjust positions
+        left: 47 * 1.5,
+        top: 47 * 1.5,
+        fill: 'white',
+        fontFamily: "Celebes",
+        fontWeight: 'bold',
+        fontStyle: 'italic',
+        fontSize: 77,
+        textAlign: 'center',
+        // Color, horizontal offset, vertical offest, blur radius
+        shadow: 'rgba(0,0,0,0.6) 0.92705px 2.853px 5px',
+        width: 993 - 47,
+        lineHeight: 0.9,
+    })
+}
+
+function fabricMakeContentText(text = '') {
+    text = text.replace(/\n*$/, '')
+
+    const txt_box = new fabric.Textbox(text, {
+        // Will need to adjust positions
+        left: 47 * 1.5,
+        // top: 1350 - content_height - 47 * 1.5,
+        fill: 'white',
+        fontFamily: "Celebes",
+        textAlign: 'left',
+        // Color, horizontal offset, vertical offest, blur radius
+        shadow: 'rgba(0,0,0,0.6) 0.92705px 2.853px 5px',
+        width: 993 - 47,
+        fontSize: 50,
+        lineHeight: 1,
+        // fontWeight: 'bold',
+        // fontStyle: 'italic',
+    })
+
+    txt_box.top = 1350 - txt_box.calcTextHeight() - 47 * 1.5;
+    return txt_box
 }
 
 module.exports = {
