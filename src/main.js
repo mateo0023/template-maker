@@ -4,7 +4,6 @@
     const path = require('path')
     const { makeBaseImage, updateSampleImage, makeFullImage } = require("./image-processing")
     const AUTO_SAVE = false;
-    const PRE_PROCESSES_IMAGE = false;
 
     // Main data object
     var mainData;
@@ -31,8 +30,9 @@
     // ******************************************************
     // ******************************************************
     document.getElementById("update-image").addEventListener('click', () => {
+        saveProgressToObj()
         makeBaseImage(currentSlide, working_path, (buff) => {
-            makeFullImage(buff, quill, currentSlide)
+            makeFullImage(buff, currentSlide)
         })
     })
 
