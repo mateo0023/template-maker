@@ -69,19 +69,21 @@ async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
 }
 
 // This should use the Canvas API to add the text to the pre_processed buffer
-function makeFullImage(buffer, quill_obj, slide_obj) {
+function makeFullImage(buffer, slide_obj) {
     const canvas = new fabric.Canvas('output-img');
-    const added_txt_padding = 43.2 * 2
+    const added_txt_padding = 47 / 2
 
     // Multiplication is to convert from HTML px to real pixels
-    let content_height = (quill_obj.getLength() > 1) ? quill_obj.getBounds(0, quill_obj.getLength()).height * 2.371900826446281 : 0;
+    // let content_height = (quill_obj.getLength() > 1) ? quill_obj.getBounds(0, quill_obj.getLength()).height * 2.371900826446281 : 0;
 
     fabric.Image.fromURL('data:image/jpeg;base64,' + buffer.toString('base64'), (img) => {
+        const title_txt_box = fabricMakeTitleText(slide_obj.title)
+        const content_txt_box = processContent(slide_obj.content)
         canvas.add(img)
-        canvas.add(fabricMakeRect(47, 47, 993, Math.round(Math.ceil(slide_obj.title.length / 27) * 60 + added_txt_padding)));
-        canvas.add(fabricMakeRect(47, Math.round(1350 - content_height - added_txt_padding - 47), 993, Math.round(content_height + added_txt_padding)));
-        canvas.add(fabricMakeTitleText(slide_obj.title))
-        canvas.add(fabricMakeContentText(quill_obj.getText(), content_height))
+        canvas.add(fabricMakeRect(47, 47, 993, title_txt_box.calcTextHeight() + added_txt_padding * 2));
+        canvas.add(fabricMakeRect(47, content_txt_box.top - added_txt_padding, 993, content_txt_box.calcTextHeight() + added_txt_padding * 2));
+        canvas.add(title_txt_box)
+        canvas.add(content_txt_box)
 
         // canvas.requestRenderAll()
     })
@@ -234,6 +236,92 @@ function fabricMakeContentText(text = '') {
     txt_box.top = 1350 - txt_box.calcTextHeight() - 47 * 1.5;
     return txt_box
 }
+
+
+// ***********************************************************************
+// ***********************************************************************
+// ********************** Text Processing Functions **********************
+// ***********************************************************************
+// ***********************************************************************
+
+function processContent(content_obj) {
+    let text = ""
+    const bold_ranges = new Array()
+    const italic_ranges = new Array()
+    const superscript_ranges = new Array()
+    const subscript_ranges = new Array()
+
+    let prev_bullet_idx = 0;
+    let working_idx = 0;
+    for (let i = 0; i < content_obj.ops.length; i++) {
+        let temp_txt;
+        let new_bullet_idx = checkIfIsBullet(content_obj.ops, i)
+
+        if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
+            prev_bullet_idx = new_bullet_idx
+            temp_txt = "• " + content_obj.ops[i].insert
+        } else {
+            temp_txt = content_obj.ops[i].insert
+        }
+
+        if (content_obj.ops[i].attributes !== undefined) {
+            if (content_obj.ops[i].attributes.bold) {
+                bold_ranges.push([working_idx, working_idx + temp_txt.length])
+            }
+            if (content_obj.ops[i].attributes.italic) {
+                italic_ranges.push([working_idx, working_idx + temp_txt.length])
+            }
+            if (content_obj.ops[i].attributes.script !== undefined) {
+                if (content_obj.ops[i].attributes.script === "super") {
+                    superscript_ranges.push([working_idx, working_idx + temp_txt.length])
+                } else if (content_obj.ops[i].attributes.script === "sub") {
+                    subscript_ranges.push([working_idx, working_idx + temp_txt.length])
+                }
+            }
+        }
+
+        text += temp_txt
+        working_idx += temp_txt.length
+    }
+
+    // Remove all the trailing '\n'
+    text = text.replace(/\n*$/, '')
+    const fabric_text = fabricMakeContentText(text)
+
+    for (var i = 0; i < bold_ranges.length; i++) {
+        fabric_text.setSelectionStyles({
+            fontWeight: 'bold'
+        }, bold_ranges[i][0], Math.min(bold_ranges[i][1]), text.length - 1)
+    }
+    for (var i = 0; i < italic_ranges.length; i++) {
+        fabric_text.setSelectionStyles({
+            fontStyle: 'italic'
+        }, italic_ranges[i][0], Math.min(italic_ranges[i][1]), text.length - 1)
+    }
+    for (var i = 0; i < superscript_ranges.length; i++) {
+        fabric_text.setSuperscript(superscript_ranges[i][0], Math.min(superscript_ranges[i][1]), text.length - 1)
+    }
+    for (var i = 0; i < subscript_ranges.length; i++) {
+        fabric_text.setSubscript(subscript_ranges[i][0], Math.min(subscript_ranges[i][1]), text.length - 1)
+    }
+
+    return fabric_text;
+}
+
+// Looks for the first item to be '\n' returns its index if it's a bullet, false otherwise
+function checkIfIsBullet(list, start_idx) {
+    for (let i = start_idx; i < list.length; i++) {
+        if (list[i].insert === "\n") {
+            if (list[i].attributes !== undefined && list[i].attributes.list == 'bullet') {
+                return i
+            }
+            else {
+                return false
+            }
+        }
+    }
+}
+
 
 module.exports = {
     updateSampleImage,
