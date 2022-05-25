@@ -36,7 +36,7 @@ app.whenReady().then(() => {
         mainWindow.toggleDevTools();
         mainWindow.once("ready-to-show", () => {
             mainWindow.maximize()
-            openFile("D:\\Users\\matab\\Pictures\\SolveIt News\\news\\6qgod1wv")
+            openFile("./testing_project")
         })
 
         mainWindow.loadFile('./src/image-preview.html')
