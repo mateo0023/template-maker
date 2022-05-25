@@ -2,7 +2,7 @@
 (() => {
     const { ipcRenderer, dialog } = require('electron');
     const path = require('path')
-    const { makeBaseImage, updateSampleImage, makeFullImage } = require("./image-processing")
+    const { makeBaseImage, updateSampleImage, makeFullImage, updateImagePreview, exportSlideToFile } = require("./image-processing")
     const AUTO_SAVE = false;
 
     // Main data object
@@ -31,9 +31,10 @@
     // ******************************************************
     document.getElementById("update-image").addEventListener('click', () => {
         saveProgressToObj()
-        makeBaseImage(currentSlide, working_path, (buff) => {
-            makeFullImage(buff, currentSlide)
-        })
+        updateImagePreview(currentSlide, working_path)
+        // makeBaseImage(currentSlide, working_path, (buff) => {
+        //     makeFullImage(buff, currentSlide)
+        // })
     })
 
     ipcRenderer.on('file:opened', (e, data, path) => {
@@ -111,6 +112,16 @@
     // Invert Image Checkbox
     document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) => {
         currentSlide.img.reverse_fit = e.target.checked
+        document.querySelector('#hide-blurred-background-container').hidden = !e.target.checked
+        makeBaseAndUpdate()
+        if (AUTO_SAVE) {
+            saveToFile();
+        }
+    })
+
+    // Invert Image Checkbox
+    document.getElementById('hide-blurred-background-checkbox').addEventListener('change', (e) => {
+        currentSlide.img.hide_blr_bk = e.target.checked
         makeBaseAndUpdate()
         if (AUTO_SAVE) {
             saveToFile();
@@ -220,6 +231,8 @@
     function updateSlide() {
         document.getElementById("selected_image").src = (currentSlide.img.src === '') ? '' : `${path.join(working_path, currentSlide.img.src)}`
         document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
+        document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
+        document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
         slide_title.value = currentSlide.title;
         quill.setContents(currentSlide.content);
         makeBaseAndUpdate()
@@ -301,7 +314,7 @@
     }
 
     function createSlideObj() {
-        return { title: "", content: {}, img: { src: "", reverse_fit: false, pre_processed_path: '' } }
+        return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false } }
     }
 
     function clearChildren(el) {
