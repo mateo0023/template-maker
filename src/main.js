@@ -34,6 +34,9 @@
         saveProgressToObj()
         updateImagePreview(currentSlide, path.join(working_path, currentSlide.img.src))
     })
+    // *******************************************************
+    // ************** END OF ONLY FOR DEBUGGING **************
+    // *******************************************************
 
     ipcRenderer.on('file:opened', (e, data, path) => {
         document.querySelector('body').hidden = false;
