@@ -7,7 +7,8 @@
     <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'">
 
     <link href="./quill/quill.snow.css" rel="stylesheet">
-    <link href="main.css" rel="stylesheet" />
+    <link rel="preload" as="font" href="fonts.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="main.css" />
 
     <script defer type="module" src="./quill/quill.js"></script>
     <script defer type="module" src="./quill/quill.min.js"></script>
@@ -50,7 +51,11 @@
                 </div>
                 <div>
                     <input type="checkbox" name="invert_fit" value="" id="inverse-fit-checkbox" />
-                    <label for="invert_fit">Smaller fit (show blurred background)</label>
+                    <label for="invert_fit">Smaller fit (shrink to fit)</label>
+                </div>
+                <div id="hide-blurred-background-container">
+                    <input type="checkbox" name="hide-blurred-background" value="" id="hide-blurred-background-checkbox" />
+                    <label for="hide-blurred-background">Hide blurred background</label>
                 </div>
             </div>
             <div>
@@ -64,15 +69,24 @@
                         <button type="button" class="ql-italic"></button>
                         <button type="button" class="ql-list" value="bullet"></button>
 
-                        <!-- <button class="ql-script" value="sub"></button> -->
-                        <!-- <button class="ql-script" value="super"></button> -->
+                        <button class="ql-script" value="sub"></button>
+                        <button class="ql-script" value="super"></button>
                     </span>
                 </div>
                 <div id="slide_content"></div>
             </div>
         </div>
+        <!-- <div>
+            <img src="" id="sample-output-img" alt="There's no image/The Slide is not complete" width="260px"
+                height="325px">
+        </div> -->
         <div>
-            <img src="" id="sample-output-img" alt="There's no image/The Slide is not complete" width="260px" height="325px">
+            <div>
+                <canvas src="" id="output-img" alt="There's no image/The Slide is not complete" width="360px"
+                    height="450px">
+                </canvas>
+            </div>
+            <button id="update-image">HEY!</button>
         </div>
     </div>
 </body>

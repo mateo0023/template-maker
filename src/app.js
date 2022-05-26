@@ -4,7 +4,6 @@ const path = require('path')
 const fs = require('fs')
 const sharp = require('sharp');
 const archiver = require('archiver');
-const { homedir } = require('os');
 
 // So that images are freed from the system after using them
 sharp.cache(false)
@@ -36,10 +35,10 @@ app.whenReady().then(() => {
         mainWindow.toggleDevTools();
         mainWindow.once("ready-to-show", () => {
             mainWindow.maximize()
-            openFile("./testing_project")
+            openFile(path.join(__dirname, "../testing_project"))
         })
 
-        mainWindow.loadFile('./src/image-preview.html')
+        mainWindow.loadFile('./src/main.html')
 
         // Kill the app when main Window closed
         mainWindow.on('closed', function () {
@@ -156,7 +155,6 @@ ipcMain.handle('select-image', async () => {
         fs.renameSync(img_path, new_img_path)
     }
 
-    console.log(`About to return ${path.relative(working_path, new_img_path)}`)
     return { rel: `${path.relative(working_path, new_img_path)}`, abs: `${new_img_path}` }
 })
 

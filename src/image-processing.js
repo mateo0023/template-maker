@@ -1,16 +1,9 @@
-
-const sharp = require('sharp')
-const path = require('path');
 const fabric = require("fabric").fabric
-
-// fabric.Object.prototype.objectCaching = false;
-
-sharp.cache(false)
 
 const canvas = new fabric.Canvas('output-img', {
     preserveObjectStacking: true
 });
-const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.1, clipName: 'blur' });
+const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.15, clipName: 'blur' });
 
 const SCALE = canvas.getHeight() / 1350;
 const CORNER_RADIUS = 43.2;
@@ -20,12 +13,20 @@ const IMAGE_HEIGHT = 1350;
 const IMAGE_WIDTH = 1080;
 const MAX_RECT_WIDTH = IMAGE_WIDTH - MARGIN * 2
 
+var logo;
+fabric.Image.fromURL(
+    './SolveIt Logo.png',
+    img => {
+        img.scaleToHeight(31 * SCALE)
+        logo = img
+    }, {
+    selectable: false,
+    top: canvas.getHeight() - 31 * 1.5 * SCALE,
+    left: canvas.getWidth() - 31 * 1.5 * SCALE,
+})
+
 // FabricJs Object of the current image
 var bkImageFabricGroup;
-// FabricJs Object of the current image
-var bkImageFabric;
-// FabricJs Object of the current image
-var bkImageBlurFabric;
 // FabricJs Object of the current blurred background
 var blBkImageFabric;
 // The FabricJS Object Containing the Title
@@ -39,114 +40,30 @@ var content_bounding_box;
 // Last object status
 var prevObj;
 
-// This ONLY uses Sharp
-async function updateSampleImage(slide_obj, base_img_buff, quill_obj) {
-    const added_txt_padding = CORNER_RADIUS * 2
-    const img_out = document.getElementById("sample-output-img")
-
-    // Process the new image if complete
-    if (!(slide_obj.title === '' && slide_obj.content === '')) {
-        // let content_height = 0
-        // const quill_contents = document.getElementById('slide_content').children[0].children
-        // for (let i = 0; i < quill_contents.length && quill_obj.getLength() > 1; i++) {
-        //     content_height += quill_contents[i].clientHeight
-        // }
-        // Multiplication is to convert from HTML px to real pixels
-        let content_height = (quill_obj.getLength() > 1) ? quill_obj.getBounds(0, quill_obj.getLength()).height * 2.371900826446281 : 0;
-        // content_height *= 2.371900826446281;
-
-        sharp(base_img_buff).composite([
-            // Create content box only if there's content
-            ...((content_height > 0) ?
-
-                [{
-                    input: await sharp({
-                        create: {
-                            width: MAX_RECT_WIDTH,
-                            height: Math.round(content_height + added_txt_padding),
-                            channels: 4,
-                            background: { r: 44, g: 109, b: 195, alpha: 0.62 }
-                        }
-                    }).png().toBuffer(),
-                    top: Math.round(IMAGE_HEIGHT - content_height - added_txt_padding - MARGIN),
-                    left: MARGIN
-                }] : []
-            ),
-            // Create title box only if there's a title
-            ...((slide_obj.title.length > 0) ?
-                [{
-                    input: await sharp({
-                        create: {
-                            width: MAX_RECT_WIDTH,
-                            // Roughly 27 chars per line, 60 pixels per line
-                            height: Math.round(Math.ceil(slide_obj.title.length / 27) * 60 + added_txt_padding),
-                            channels: 4,
-                            background: { r: 44, g: 109, b: 195, alpha: 0.62 }
-                        }
-                    }).png().toBuffer(),
-                    top: MARGIN,
-                    left: MARGIN
-                }] : [])
-        ])
-            .jpeg().toBuffer((e, buff, info) => {
-                if (e) {
-                    console.log(e)
-                    img_out.src = ''
-                } else {
-                    img_out.src = 'data:image/jpeg;base64,' + buff.toString('base64');
-                }
-            })
-    } else {
-        img_out.src = 'data:image/jpeg;base64,' + base_img_buff.toBuffer().toString('base64');
-    }
-}
-
-// This should use the Canvas API to add the text to the pre_processed buffer
-function makeFullImage(buffer, slide_obj) {
-}
-
 // This will update the image preview (no blur behind text)
-function updateImagePreview(new_slide_obj, working_path) {
-    const full_image_path = path.join(working_path, new_slide_obj.img.src)
-
+function updateImagePreview(new_slide_obj, full_image_path) {
     return new Promise((res, rej) => {
         // This will be done last, it is where the promise will be resolved
         const updateCanvas = () => {
             canvas.clear()
-            if (new_slide_obj.img.hide_blr_bk === undefined || new_slide_obj.img.hide_blr_bk === false) {
+            if (blBkImageFabric !== undefined &&
+                (new_slide_obj.img.hide_blr_bk === undefined || new_slide_obj.img.hide_blr_bk === false)) {
                 canvas.add(blBkImageFabric)
             }
 
-            bkImageFabricGroup = new fabric.Group([
-                bkImageFabric, bkImageBlurFabric
-            ],
-                {
-                    lockRotation: true,
-                    lockMovementX: true,
-                    // lockScalingX: true,
-                    // lockScalingY: true,
-                    centeredScaling: true,
-                    lockSkewingX: true,
-                    lockSkewingY: true,
-                    objectCaching: false
-                })
             canvas.add(bkImageFabricGroup)
             addTextToCanvas(new_slide_obj)
-            
+
+            canvas.add(logo)
+
             res(true)
         };
 
         if (prevObj?.img?.src !== new_slide_obj.img.src) {
-            let async_counter = 3;
+            let async_counter = 2;
 
             // Will need to update both images
-            updateBkImageFabric(new_slide_obj, full_image_path, () => {
-                async_counter--;
-                if (async_counter == 0) {
-                    updateCanvas()
-                }
-            })
-            updateBkImageBlurFabric(new_slide_obj, full_image_path, () => {
+            updateBkImageGroup(new_slide_obj, full_image_path, () => {
                 async_counter--;
                 if (async_counter == 0) {
                     updateCanvas()
@@ -160,19 +77,7 @@ function updateImagePreview(new_slide_obj, working_path) {
                 }
             })
         } else if (prevObj?.img?.reverse_fit !== new_slide_obj.img.reverse_fit) {
-            let async_counter = 2;
-            updateBkImageFabric(new_slide_obj, full_image_path, () => {
-                async_counter--;
-                if (async_counter == 0) {
-                    updateCanvas()
-                }
-            })
-            updateBkImageBlurFabric(new_slide_obj, full_image_path, () => {
-                async_counter--;
-                if (async_counter == 0) {
-                    updateCanvas()
-                }
-            })
+            updateBkImageGroup(new_slide_obj, full_image_path, updateCanvas)
         } else {
             updateCanvas()
         }
@@ -182,102 +87,26 @@ function updateImagePreview(new_slide_obj, working_path) {
 
 }
 
+function loadFromJSON(slide_obj, full_image_path) {
+    if (slide_obj.fabric !== undefined) {
+        canvas.loadFromJSON(slide_obj.fabric)
+    } else {
+        updateImagePreview(slide_obj, full_image_path)
+    }
+}
+
 function exportSlideToFile(slide_obj, working_path) {
     updateImagePreview(slide_obj, working_path).then(result => {
         canvas.toDataURL({
             format: 'jpeg',
-            multiplier: 1/SCALE
+            multiplier: 1 / SCALE
         })
     })
 
 }
 
-function getTxtSvg(slide_obj) {
-    canvas.clear()
-
-    // canvas.setBackgroundColor()
-    addTextToCanvas(slide_obj)
-}
-
-// Sets the curr_pre_processed_image to the most current values of slide
-// Will call the _callback function with the updated base_lyr
-async function makeBaseImage(slide, working_path, _callback = () => { }) {
-    if (slide.img.src === '' || slide.img.src === undefined) {
-        // Make the callback to the object
-        _callback(
-            await sharp({
-                create: {
-                    width: IMAGE_WIDTH,
-                    height: IMAGE_HEIGHT,
-                    channels: 3,
-                    background: { r: 29, g: 219, b: 121, }
-                }
-            }).jpeg().toBuffer()
-        )
-    } else {
-        const full_image_path = path.join(working_path, slide.img.src)
-
-        const foreground_img = await getSharpImage(full_image_path, slide.img.reverse_fit)
-
-        let base_lyr = sharp({
-            create: {
-                width: IMAGE_WIDTH,
-                height: IMAGE_HEIGHT,
-                channels: 3,
-                background: { r: 0, g: 0, b: 0 }
-            }
-        }).composite([
-            // Add the blurred background only if necessary
-            ...((slide.img.reverse_fit) ?
-                [{
-                    input: await getSharpBlurredBuffer(full_image_path),
-                    top: 0,
-                    left: 0
-                }]
-                : []),
-            // Background Image
-            {
-                input: await foreground_img.toBuffer(),
-                top: (slide.img.reverse_fit) ? Math.round((IMAGE_HEIGHT - (await foreground_img.metadata()).height) / 2) : 0,
-                left: 0
-            }])
-
-        if (path.extname(slide.img.src) === '.png') {
-            base_lyr = await base_lyr.png()
-        } else if (path.extname(slide.img.src) === '.jpeg' || path.extname(slide.img.src) === '.jpg') {
-            base_lyr = await base_lyr.jpeg()
-        }
-
-        _callback(await base_lyr.toBuffer())
-    }
-}
-
-// **********************************************************************
-// **********************************************************************
-// *********************** Sharp Helper Functions ***********************
-// **********************************************************************
-// **********************************************************************
-
-function getSharpBlurredBuffer(image_path) {
-    return sharp(image_path).resize(IMAGE_WIDTH, IMAGE_HEIGHT, { fit: "cover" }).blur(20).toBuffer()
-}
-
-function getSharpImage(image_path, reverse_fit = false) {
-    return sharp(image_path)
-        .resize(IMAGE_WIDTH, IMAGE_HEIGHT, { fit: (reverse_fit) ? "inside" : "cover" })
-}
-
-function getSharpImageBkBuffer(image_path, reverse_fit = false) {
-    return sharp(image_path)
-        .resize(IMAGE_WIDTH, IMAGE_HEIGHT, { fit: (reverse_fit) ? "inside" : "cover" }).blur(5).toBuffer()
-}
-
-function maskBkWithSvg(svg) {
-
-}
-
-function getSharpImageBuffer(image_path, reverse_fit = false) {
-    return getSharpImage(image_path, reverse_fit).toBuffer()
+function getCanvasObj() {
+    return JSON.stringify(canvas)
 }
 
 
@@ -296,16 +125,24 @@ function addTextToCanvas(slide_obj, _callback = addExistingTxtToCanvas) {
 
     title_txt_box = fabricMakeTitleText(slide_obj.title)
     content_txt_box = processContent(slide_obj.content)
-    title_bounding_box = fabricMakeRect(MARGIN * SCALE, MARGIN * SCALE, MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
-    content_bounding_box = fabricMakeRect(MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE, MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+    title_bounding_box = fabricMakeRect(
+        MARGIN * SCALE, MARGIN * SCALE,
+        MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+    content_bounding_box = fabricMakeRect(
+        MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
+        MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
 
-    if (bkImageBlurFabric !== undefined) {
-        bkImageBlurFabric.clipPath = new fabric.Group(
+    if (bkImageFabricGroup !== undefined) {
+        bkImageFabricGroup._objects[1].clipPath = new fabric.Group(
             [
                 // Title Box
-                fabricMakeRect(MARGIN * SCALE, MARGIN * SCALE, MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE),
+                fabricMakeRect(
+                    MARGIN * SCALE, MARGIN * SCALE,
+                    MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE),
                 // Content Box
-                fabricMakeRect(MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE, MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+                fabricMakeRect(
+                    MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
+                    MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
             ],
             {
                 absolutePositioned: true
@@ -323,89 +160,115 @@ function addExistingTxtToCanvas() {
     canvas.add(content_txt_box)
 }
 
-// Will update the bkImageFabric (THE CALLBACK ADDS TO CANVAS)
-function updateBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
+// Returns the vertical position of the Top image
+function getPosition() {
+    // If it's not defined or it's at default "top" position, return null
+    if (bkImageFabricGroup === undefined
+        ||
+        bkImageFabricGroup.top === (IMAGE_HEIGHT * SCALE - bkImageFabricGroup.getScaledHeight()) / 2) {
+        return null;
+    }
+    return bkImageFabricGroup.top / SCALE
+}
+
+function updateBkImageGroup(slide_obj, img_path, _callback = (group) => { canvas.add(group) }) {
+    const images = {}
+
+    const lastPart = () => {
+        bkImageFabricGroup = new fabric.Group(
+            [
+                images.non_blurred, images.blurred
+            ],
+            {
+                ...((slide_obj.img.reverse_fit) ?
+                    {
+                        lockRotation: true,
+                        lockMovementX: true,
+                        centeredScaling: true,
+                        lockSkewingX: true,
+                        lockSkewingY: true
+                    }
+                    :
+                    { selectable: false }
+                ),
+                objectCaching: false
+            }
+        )
+
+        _callback(bkImageFabricGroup)
+    }
+
+    let async_counter = 2;
+
+    getBkImageFabric(slide_obj, img_path, (img) => {
+        images.non_blurred = img
+        async_counter--;
+        if (async_counter == 0) {
+            lastPart()
+        }
+    })
+
+    getBlurredBkImageFabric(slide_obj, img_path, (img) => {
+        images.blurred = img
+        async_counter--;
+        if (async_counter == 0) {
+            lastPart()
+        }
+    })
+}
+
+// Will create an image, scale it properly and pass it to the callback
+function getBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
     fabric.Image.fromURL(
         img_path,
         (img, err) => {
             if (err) {
-                canvas.remove(bkImageFabric)
-                bkImageFabric = undefined;
                 throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
             } else {
-                if (bkImageFabric !== undefined) {
-                    canvas.remove(bkImageFabric)
-                }
-
-                bkImageFabric = img
-
                 if (slide_obj.img?.reverse_fit) {
-                    if (bkImageFabric.getScaledWidth() / bkImageFabric.getScaledHeight() > 4.0 / 5) {
-                        bkImageFabric.scaleToWidth(canvas.getWidth())
+                    if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
+                        img.scaleToWidth(canvas.getWidth())
                     } else {
-                        bkImageFabric.scaleToHeight(canvas.getHeight())
+                        img.scaleToHeight(canvas.getHeight())
                     }
-
-
-                    bkImageFabric.set({ 'top': (IMAGE_HEIGHT * SCALE - bkImageFabric.getScaledHeight()) / 2 });
+                } else {
+                    if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
+                        img.scaleToHeight(canvas.getHeight())
+                    } else {
+                        img.scaleToWidth(canvas.getWidth())
+                    }
                 }
 
-                _callback(bkImageFabric)
+                if (typeof slide_obj.img?.top == 'number') {
+                    img.set({ 'top': slide_obj.img.top * SCALE });
+                } else {
+                    img.set({ 'top': (IMAGE_HEIGHT * SCALE - img.getScaledHeight()) / 2 });
+                }
+
+                _callback(img)
             }
         },
-        {
-            lockRotation: true,
-            lockMovementX: true,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockSkewingX: true,
-            lockSkewingY: true,
-        })
+        // {
+        //     lockRotation: true,
+        //     lockMovementX: true,
+        //     lockScalingX: true,
+        //     lockScalingY: true,
+        //     lockSkewingX: true,
+        //     lockSkewingY: true,
+        //     objectCaching: false
+        // }
+    )
 
 }
 
-// Will update the bkImageFabric (THE CALLBACK ADDS TO CANVAS)
-function updateBkImageBlurFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
-    fabric.Image.fromURL(
-        img_path,
-        (img, err) => {
-            if (err) {
-                canvas.remove(bkImageBlurFabric)
-                bkImageBlurFabric = undefined;
-                throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
-            } else {
-                if (bkImageBlurFabric !== undefined) {
-                    canvas.remove(bkImageBlurFabric)
-                }
+// Will pass a slighly blurred image to the callback function
+function getBlurredBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
+    getBkImageFabric(slide_obj, img_path, (img) => {
+        img.filters.push(smallBkBlur)
+        img.applyFilters()
 
-                bkImageBlurFabric = img
-
-                if (slide_obj.img?.reverse_fit) {
-                    if (bkImageBlurFabric.getScaledWidth() / bkImageBlurFabric.getScaledHeight() > 4.0 / 5) {
-                        bkImageBlurFabric.scaleToWidth(canvas.getWidth())
-                    } else {
-                        bkImageBlurFabric.scaleToHeight(canvas.getHeight())
-                    }
-
-
-                    bkImageBlurFabric.set({ 'top': (IMAGE_HEIGHT * SCALE - bkImageBlurFabric.getScaledHeight()) / 2 });
-                }
-
-                bkImageBlurFabric.filters.push(smallBkBlur)
-                bkImageBlurFabric.applyFilters()
-
-                _callback(bkImageBlurFabric)
-            }
-        },
-        {
-            lockRotation: true,
-            lockMovementX: true,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockSkewingX: true,
-            lockSkewingY: true,
-        })
-
+        _callback(img)
+    })
 }
 
 // Will update the blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
@@ -584,9 +447,9 @@ function checkIfIsBullet(list, start_idx) {
 
 
 module.exports = {
-    updateSampleImage,
-    makeBaseImage,
-    makeFullImage,
     updateImagePreview,
-    exportSlideToFile
+    exportSlideToFile,
+    getPosition,
+    getCanvasObj,
+    loadFromJSON
 }

@@ -1,8 +1,8 @@
 
 (() => {
-    const { ipcRenderer, dialog } = require('electron');
+    const { ipcRenderer } = require('electron');
     const path = require('path')
-    const { makeBaseImage, updateSampleImage, makeFullImage, updateImagePreview, exportSlideToFile } = require("./image-processing")
+    const { updateImagePreview, getPosition, getCanvasObj } = require("./image-processing")
     const AUTO_SAVE = false;
 
     // Main data object
@@ -21,7 +21,8 @@
     });
 
     const makeBaseAndUpdate = () => {
-        makeBaseImage(currentSlide, working_path, (buff) => { updateSampleImage(currentSlide, buff, quill) })
+        saveProgressToObj()
+        updateImagePreview(currentSlide, path.join(working_path, currentSlide.img.src))
     }
 
     // ******************************************************
@@ -31,10 +32,7 @@
     // ******************************************************
     document.getElementById("update-image").addEventListener('click', () => {
         saveProgressToObj()
-        updateImagePreview(currentSlide, working_path)
-        // makeBaseImage(currentSlide, working_path, (buff) => {
-        //     makeFullImage(buff, currentSlide)
-        // })
+        updateImagePreview(currentSlide, path.join(working_path, currentSlide.img.src))
     })
 
     ipcRenderer.on('file:opened', (e, data, path) => {
@@ -306,6 +304,8 @@
 
         currentSlide.title = slide_title.value
         currentSlide.content = quill.getContents()
+        currentSlide.img.top = getPosition()
+        currentSlide.fabric = getCanvasObj()
     }
 
     function saveToFile() {
@@ -314,7 +314,7 @@
     }
 
     function createSlideObj() {
-        return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false } }
+        return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null } }
     }
 
     function clearChildren(el) {
