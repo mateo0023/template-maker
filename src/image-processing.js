@@ -41,7 +41,7 @@ var content_bounding_box;
 var prevObj;
 
 // This will update the image preview (no blur behind text)
-function updateImagePreview(new_slide_obj, full_image_path) {
+function updateImagePreview(new_slide_obj) {
     return new Promise((res, rej) => {
         // This will be done last, it is where the promise will be resolved
         const updateCanvas = () => {
@@ -63,21 +63,21 @@ function updateImagePreview(new_slide_obj, full_image_path) {
             let async_counter = 2;
 
             // Will need to update both images
-            updateBkImageGroup(new_slide_obj, full_image_path, () => {
+            updateBkImageGroup(new_slide_obj, () => {
                 async_counter--;
                 if (async_counter == 0) {
                     updateCanvas()
                 }
             })
 
-            updateBlBkImageFabric(new_slide_obj, full_image_path, () => {
+            updateBlBkImageFabric(new_slide_obj, () => {
                 async_counter--;
                 if (async_counter == 0) {
                     updateCanvas()
                 }
             })
         } else if (prevObj?.img?.reverse_fit !== new_slide_obj.img.reverse_fit) {
-            updateBkImageGroup(new_slide_obj, full_image_path, updateCanvas)
+            updateBkImageGroup(new_slide_obj, updateCanvas)
         } else {
             updateCanvas()
         }
@@ -87,16 +87,16 @@ function updateImagePreview(new_slide_obj, full_image_path) {
 
 }
 
-function loadFromJSON(slide_obj, full_image_path) {
+function loadFromJSON(slide_obj) {
     if (slide_obj.fabric !== undefined) {
         canvas.loadFromJSON(slide_obj.fabric)
     } else {
-        updateImagePreview(slide_obj, full_image_path)
+        updateImagePreview(slide_obj)
     }
 }
 
-function exportSlideToFile(slide_obj, working_path) {
-    updateImagePreview(slide_obj, working_path).then(result => {
+function exportSlideToFile(slide_obj) {
+    updateImagePreview(slide_obj).then(result => {
         canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / SCALE
@@ -171,7 +171,7 @@ function getPosition() {
     return bkImageFabricGroup.top / SCALE
 }
 
-function updateBkImageGroup(slide_obj, img_path, _callback = (group) => { canvas.add(group) }) {
+function updateBkImageGroup(slide_obj, _callback = (group) => { canvas.add(group) }) {
     const images = {}
 
     const lastPart = () => {
@@ -200,7 +200,7 @@ function updateBkImageGroup(slide_obj, img_path, _callback = (group) => { canvas
 
     let async_counter = 2;
 
-    getBkImageFabric(slide_obj, img_path, (img) => {
+    getBkImageFabric(slide_obj, (img) => {
         images.non_blurred = img
         async_counter--;
         if (async_counter == 0) {
@@ -208,7 +208,7 @@ function updateBkImageGroup(slide_obj, img_path, _callback = (group) => { canvas
         }
     })
 
-    getBlurredBkImageFabric(slide_obj, img_path, (img) => {
+    getBlurredBkImageFabric(slide_obj, (img) => {
         images.blurred = img
         async_counter--;
         if (async_counter == 0) {
@@ -218,9 +218,9 @@ function updateBkImageGroup(slide_obj, img_path, _callback = (group) => { canvas
 }
 
 // Will create an image, scale it properly and pass it to the callback
-function getBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
+function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
     fabric.Image.fromURL(
-        img_path,
+        slide_obj.img.src,
         (img, err) => {
             if (err) {
                 throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
@@ -262,8 +262,8 @@ function getBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add
 }
 
 // Will pass a slighly blurred image to the callback function
-function getBlurredBkImageFabric(slide_obj, img_path, _callback = (img) => { canvas.add(img) }) {
-    getBkImageFabric(slide_obj, img_path, (img) => {
+function getBlurredBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
+    getBkImageFabric(slide_obj, (img) => {
         img.filters.push(smallBkBlur)
         img.applyFilters()
 
@@ -272,9 +272,9 @@ function getBlurredBkImageFabric(slide_obj, img_path, _callback = (img) => { can
 }
 
 // Will update the blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
-function updateBlBkImageFabric(slide_obj, img_path, _callback = img => { canvas.add(img) }) {
+function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }) {
     fabric.Image.fromURL(
-        img_path,
+        slide_obj.img.src,
         (img, err) => {
             if (err) {
                 canvas.remove(blBkImageFabric)

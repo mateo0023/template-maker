@@ -22,7 +22,8 @@
 
     const makeBaseAndUpdate = () => {
         saveProgressToObj()
-        updateImagePreview(currentSlide, path.join(working_path, currentSlide.img.src))
+        // Only while debugging
+        updateImagePreview(currentSlide)
     }
 
     // ******************************************************
@@ -32,7 +33,7 @@
     // ******************************************************
     document.getElementById("update-image").addEventListener('click', () => {
         saveProgressToObj()
-        updateImagePreview(currentSlide, path.join(working_path, currentSlide.img.src))
+        updateImagePreview(currentSlide)
     })
     // *******************************************************
     // ************** END OF ONLY FOR DEBUGGING **************
@@ -219,6 +220,11 @@
                 updateSlide();
             })
 
+            new_it.draggable = true;
+
+            new_it.addEventListener('ondragover', e => { prevent_default(e, slide) })
+            new_it.addEventListener('ondrop', e => { drop_handler(e, slide) })
+
             if (currentArticle.slides[i] === currentSlide) {
                 curr_slide_list_item = new_it
                 new_it.classList.add('selected')
@@ -301,6 +307,22 @@
         updateSlidesList(false)
     }
 
+    function prevent_default(e){
+        e.preventDefault()
+    }
+
+    function drop_handler(e, slide){
+        e.preventDefault();
+
+        if(e.files.length > 0 && e.files[0].type.startsWith('image')){
+            ((slide === undefined) ? currentSlide : slide).img.src = e.files[0].createObjectURL()
+        } else {
+            ((slide === undefined) ? currentSlide : slide).img.src = e.dataTransfer.getData("URL");
+        }
+        if(slide !== currentSlide){
+            updateImagePreview(currentSlide)
+        }
+    }
 
     function saveProgressToObj() {
         // The slide content is handled by quill
