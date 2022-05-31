@@ -1,3 +1,4 @@
+import { read } from "original-fs";
 import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
 (() => {
     const { ipcRenderer } = require('electron');
@@ -106,21 +107,34 @@ import { updateImagePreview, getPosition, getCanvasObj } from "./image-processin
         // })
     })
 
-    document.getElementById('update-image').addEventListener("dragover", (e) => {
+    document.getElementById('canvas-container').addEventListener("dragover", (e) => {
         e.stopPropagation()
         e.preventDefault()
 
         e.dataTransfer.dropEffect = "move";
     })
 
-    document.getElementById('update-image').addEventListener("drop", (e) => {
+    document.getElementById('canvas-container').addEventListener("drop", (e) => {
         e.stopPropagation()
         e.preventDefault()
         console.log('Dropped Data!')
 
+        if (e.dataTransfer.files.length > 0 && e.dataTransfer.files[0].type.startsWith('image/')) {
+            // const reader = new FileReader()
+
+            // reader.addEventListener("load", function () {
+            //     // convert image file to base64 string
+            //     console.log(reader.result)
+            //     preview.src = reader.result;
+            // }, false);
+
+            // reader.readAsDataURL(e.dataTransfer.files[0])
+        } else {
+            currentSlide.img.src = e.dataTransfer.getData("URL");
+            console.log(e.dataTransfer.getData("URL"))
+        }
+
         // Get the id of the target and add the moved element to the target's DOM
-        const data = e.dataTransfer.getData("text/plain");
-        console.log(data)
         // ev.target.appendChild(document.getElementById(data))
     })
 

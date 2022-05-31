@@ -7,13 +7,13 @@
     <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self'">
 
     <link href="./lib/quill/quill.snow.css" rel="stylesheet">
-    <link rel="preload" as="font" href="fonts.css" crossorigin="anonymous"/>
-    <link rel="stylesheet" href="main.css" />
+    <link rel="preload" as="font" href="./fonts.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="./main.css" />
 
     <script defer type="module" src="./lib/quill/quill.min.js"></script>
     <script defer src="./lib/fabric.min.js"></script>
     <script defer type="module" src="./image-processing.js"></script>
-    <script defer type="module"src="main.js"></script>
+    <script defer type="module"src="./index.js"></script>
 </head>
 
 <body>
@@ -78,7 +78,7 @@
             </div>
         </div>
         <div>
-            <div>
+            <div id="canvas-container">
                 <canvas src="" id="output-img" alt="" width="360px"
                     height="450px" draggable="true">
                 </canvas>

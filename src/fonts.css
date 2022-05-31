@@ -1,25 +1,33 @@
 @font-face {
     font-family: "Celebes";
-    src: url("./fonts/Celebes-Regular.ttf");
+    src: url("./fonts/Celebes-Regular.woff2") format("woff2"),
+        url("./fonts/otf/Celebes-Regular.otf") format("opentype"),
+        url("./fonts/ttf/Celebes-Regular.ttf") format("truetype");
 }
 
 @font-face {
     font-family: "Celebes";
-    src: url("./fonts/Celebes-Bold.ttf");
+    src: url("./fonts/Celebes-Bold.woff2") format("woff2"),
+        url("./fonts/otf/Celebes-Bold.otf") format("opentype"),
+        url("./fonts/ttf/Celebes-Bold.ttf") format("truetype");
     font-style: normal;
     font-weight: bold;
 }
 
 @font-face {
     font-family: "Celebes";
-    src: url("./fonts/Celebes-BoldItalic.ttf");
+    src: url("./fonts/Celebes-BoldItalic.woff2") format("woff2"),
+        url("./fonts/otf/Celebes-BoldItalic.otf") format("opentype"),
+        url("./fonts/ttf/Celebes-BoldItalic.ttf") format("truetype");
     font-style: italic;
     font-weight: bold;
 }
 
 @font-face {
     font-family: "Celebes";
-    src: url("./fonts/Celebes-Italic.ttf");
+    src: url("./fonts/Celebes-Italic.woff2") format("woff2"),
+        url("./fonts/otf/Celebes-Italic.otf") format("opentype"),
+        url("./fonts/ttf/Celebes-Italic.ttf") format("truetype");
     font-style: italic;
     font-weight: normal;
 }

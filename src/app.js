@@ -38,7 +38,7 @@ app.whenReady().then(() => {
             openFile(path.join(__dirname, "../testing_project"))
         })
 
-        mainWindow.loadFile('./src/main.html')
+        mainWindow.loadFile('./src/index.html')
 
         // Kill the app when main Window closed
         mainWindow.on('closed', function () {
