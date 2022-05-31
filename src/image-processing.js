@@ -1,4 +1,5 @@
-const fabric = require("fabric").fabric
+// Requires Fabric.js to be defined
+// import { fabric } from "./lib/fabric.min.js";
 
 const canvas = new fabric.Canvas('output-img', {
     preserveObjectStacking: true
@@ -51,7 +52,10 @@ function updateImagePreview(new_slide_obj) {
                 canvas.add(blBkImageFabric)
             }
 
-            canvas.add(bkImageFabricGroup)
+            if (bkImageFabricGroup !== undefined) {
+                console.log(`About to add ${bkImageFabricGroup}`)
+                canvas.add(bkImageFabricGroup)
+            }
             addTextToCanvas(new_slide_obj)
 
             canvas.add(logo)
@@ -59,7 +63,11 @@ function updateImagePreview(new_slide_obj) {
             res(true)
         };
 
-        if (prevObj?.img?.src !== new_slide_obj.img.src) {
+        if (new_slide_obj.img.src === '') {
+            bkImageFabricGroup = undefined
+            blBkImageFabric = undefined
+            updateCanvas()
+        } else if (prevObj?.img?.src !== new_slide_obj.img.src) {
             let async_counter = 2;
 
             // Will need to update both images
@@ -106,7 +114,7 @@ function exportSlideToFile(slide_obj) {
 }
 
 function getCanvasObj() {
-    return JSON.stringify(canvas)
+    return ""//JSON.stringify(canvas)
 }
 
 
@@ -118,31 +126,48 @@ function getCanvasObj() {
 
 // Will process all text and textboxes and add them to the Canvas
 function addTextToCanvas(slide_obj, _callback = addExistingTxtToCanvas) {
-    canvas.remove(title_txt_box)
-    canvas.remove(content_txt_box)
-    canvas.remove(title_bounding_box)
-    canvas.remove(content_bounding_box)
+
+    if (title_bounding_box !== null && title_bounding_box !== undefined) {
+        canvas.remove(title_bounding_box);
+    }
+    if (content_bounding_box !== null && content_bounding_box !== undefined) {
+        canvas.remove(content_bounding_box);
+    }
+    if (title_txt_box !== null && title_txt_box !== undefined) {
+        canvas.remove(title_txt_box)
+    }
+    if (content_txt_box !== null && content_txt_box !== undefined) {
+        canvas.remove(content_txt_box)
+    }
 
     title_txt_box = fabricMakeTitleText(slide_obj.title)
     content_txt_box = processContent(slide_obj.content)
-    title_bounding_box = fabricMakeRect(
-        MARGIN * SCALE, MARGIN * SCALE,
-        MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
-    content_bounding_box = fabricMakeRect(
-        MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
-        MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+    if (title_txt_box === null) {
+        title_bounding_box = null
+    } else {
+        title_bounding_box = fabricMakeRect(
+            MARGIN * SCALE, MARGIN * SCALE,
+            MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+    }
+    if (content_txt_box === null) {
+        content_bounding_box = null
+    } else {
+        content_bounding_box = fabricMakeRect(
+            MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
+            MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+    }
 
-    if (bkImageFabricGroup !== undefined) {
+    if (bkImageFabricGroup !== undefined && (title_txt_box !== null || content_txt_box !== null)) {
         bkImageFabricGroup._objects[1].clipPath = new fabric.Group(
             [
                 // Title Box
-                fabricMakeRect(
+                ...((title_txt_box === null) ? [] : [fabricMakeRect(
                     MARGIN * SCALE, MARGIN * SCALE,
-                    MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE),
+                    MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)]),
                 // Content Box
-                fabricMakeRect(
+                ...((content_txt_box === null) ? [] : [fabricMakeRect(
                     MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
-                    MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+                    MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)])
             ],
             {
                 absolutePositioned: true
@@ -150,14 +175,21 @@ function addTextToCanvas(slide_obj, _callback = addExistingTxtToCanvas) {
         )
     }
 
-    _callback()
+    if (title_bounding_box !== null && title_bounding_box !== undefined) {
+        canvas.add(title_bounding_box);
+    }
+    if (content_bounding_box !== null && content_bounding_box !== undefined) {
+        canvas.add(content_bounding_box);
+    }
+    if (title_txt_box !== null && title_txt_box !== undefined) {
+        canvas.add(title_txt_box)
+    }
+    if (content_txt_box !== null && content_txt_box !== undefined) {
+        canvas.add(content_txt_box)
+    }
 }
 
 function addExistingTxtToCanvas() {
-    canvas.add(title_bounding_box);
-    canvas.add(content_bounding_box);
-    canvas.add(title_txt_box)
-    canvas.add(content_txt_box)
 }
 
 // Returns the vertical position of the Top image
@@ -247,16 +279,7 @@ function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
 
                 _callback(img)
             }
-        },
-        // {
-        //     lockRotation: true,
-        //     lockMovementX: true,
-        //     lockScalingX: true,
-        //     lockScalingY: true,
-        //     lockSkewingX: true,
-        //     lockSkewingY: true,
-        //     objectCaching: false
-        // }
+        }
     )
 
 }
@@ -322,6 +345,9 @@ function fabricMakeRect(x, y, width, height) {
 }
 
 function fabricMakeTitleText(text) {
+    if (text === undefined || text === null || text === '') {
+        return null
+    }
     return new fabric.Textbox(text, {
         // Will need to adjust positions
         left: MARGIN * 1.5 * SCALE,
@@ -340,7 +366,10 @@ function fabricMakeTitleText(text) {
     })
 }
 
-function fabricMakeContentText(text = '') {
+function fabricMakeContentText(text) {
+    if (text === undefined || text === null || text === '') {
+        return null
+    }
     text = text.replace(/\n*$/, '')
 
     const txt_box = new fabric.Textbox(text, {
@@ -407,8 +436,14 @@ function processContent(content_obj) {
         working_idx += temp_txt.length
     }
 
+
     // Remove all the trailing '\n'
     text = text.replace(/\n*$/, '')
+
+    if (text === '') {
+        return null
+    }
+
     const fabric_text = fabricMakeContentText(text)
 
     for (var i = 0; i < bold_ranges.length; i++) {
@@ -445,8 +480,7 @@ function checkIfIsBullet(list, start_idx) {
     }
 }
 
-
-module.exports = {
+export {
     updateImagePreview,
     exportSlideToFile,
     getPosition,

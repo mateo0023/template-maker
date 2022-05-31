@@ -1,13 +1,10 @@
-
+import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
 (() => {
     const { ipcRenderer } = require('electron');
-    const path = require('path')
-    const { updateImagePreview, getPosition, getCanvasObj } = require("./image-processing")
     const AUTO_SAVE = false;
 
     // Main data object
-    var mainData;
-    var working_path;
+    var mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
     var currentArticle;
     var currentSlide;
     var curr_slide_list_item;
@@ -26,6 +23,8 @@
         updateImagePreview(currentSlide)
     }
 
+    updateArticlesList()
+
     // ******************************************************
     // ******************************************************
     // ***************** ONLY FOR DEBUGGING *****************
@@ -39,43 +38,36 @@
     // ************** END OF ONLY FOR DEBUGGING **************
     // *******************************************************
 
-    ipcRenderer.on('file:opened', (e, data, path) => {
-        document.querySelector('body').hidden = false;
+    // ipcRenderer.on('file:opened', (e, data, path) => {
+    //     document.querySelector('body').hidden = false;
 
-        mainData = data
-        working_path = `${path}`
+    //     mainData = data
+    //     working_path = `${path}`
 
-        updateArticlesList();
-    })
+    //     updateArticlesList();
+    // })
 
-    ipcRenderer.on('file:save-request', (e, data) => {
-        saveProgressToObj();
-        e.sender.send('file:save-response', mainData);
-        updateArticlesList(false);
-    })
+    // ipcRenderer.on('file:save-request', (e, data) => {
+    //     saveProgressToObj();
+    //     e.sender.send('file:save-response', mainData);
+    //     updateArticlesList(false);
+    // })
 
-    ipcRenderer.on('export-request', (event) => {
-        saveProgressToObj()
-        event.sender.send('export-response', mainData)
-    })
+    // ipcRenderer.on('export-request', (event) => {
+    //     saveProgressToObj()
+    //     event.sender.send('export-response', mainData)
+    // })
 
-    ipcRenderer.on('title-response', (e, result) => {
-        currentSlide = createSlideObj();
-        currentSlide.title = result;
-        let art = { title: result, slides: [currentSlide] }
-        currentArticle = art
+    // ipcRenderer.on('title-response', (e, result) => {
+    // addArticle(result)
+    // })
 
-        mainData.articles.push(art)
-
-        updateArticlesList(false);
-    })
-
-    ipcRenderer.on('make-article', makeNewArticle)
-    ipcRenderer.on('remove-article', removeArticle)
-    ipcRenderer.on('make-slide', makeNewSlide)
-    ipcRenderer.on('remove-slide', removeSlide)
-    ipcRenderer.on('move-slide-up', moveSlideUp)
-    ipcRenderer.on('move-slide-down', moveSlideDown)
+    // ipcRenderer.on('make-article', addArticle)
+    // ipcRenderer.on('remove-article', removeArticle)
+    // ipcRenderer.on('make-slide', makeNewSlide)
+    // ipcRenderer.on('remove-slide', removeSlide)
+    // ipcRenderer.on('move-slide-up', moveSlideUp)
+    // ipcRenderer.on('move-slide-down', moveSlideDown)
 
     // When you change slide contents
     quill.on('text-change', () => {
@@ -87,7 +79,10 @@
     // Title input
     document.getElementById('slide_title').addEventListener('input', (e) => {
         currentSlide.title = e.target.value;
-        curr_slide_list_item.innerHTML = (currentSlide.title === '') ? 'No Title' : currentSlide.title
+        curr_slide_list_item.innerHTML = getSlideTitle(currentSlide)
+        if (currentSlide === currentArticle.slides[0]) {
+            document.querySelector("#articles_list > .selected").innerHTML = getSlideTitle(currentSlide)
+        }
         makeBaseAndUpdate()
     })
 
@@ -101,14 +96,32 @@
     // Image Selector Button
     document.getElementById("image_selector").addEventListener('click', () => {
         saveProgressToObj();
-        ipcRenderer.invoke('select-image').then((result) => {
-            currentSlide.img.src = result.rel
-            document.getElementById("selected_image").src = result.abs
-            makeBaseAndUpdate()
-            if (AUTO_SAVE) {
-                saveToFile();
-            }
-        })
+        // ipcRenderer.invoke('select-image').then((result) => {
+        //     currentSlide.img.src = result.rel
+        //     document.getElementById("selected_image").src = result.abs
+        //     makeBaseAndUpdate()
+        //     if (AUTO_SAVE) {
+        //         saveToFile();
+        //     }
+        // })
+    })
+
+    document.getElementById('update-image').addEventListener("dragover", (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+
+        e.dataTransfer.dropEffect = "move";
+    })
+
+    document.getElementById('update-image').addEventListener("drop", (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        console.log('Dropped Data!')
+
+        // Get the id of the target and add the moved element to the target's DOM
+        const data = e.dataTransfer.getData("text/plain");
+        console.log(data)
+        // ev.target.appendChild(document.getElementById(data))
     })
 
     // Invert Image Checkbox
@@ -141,7 +154,7 @@
     })
 
     // Add Article Button
-    document.getElementById("add_art_btn").addEventListener('click', makeNewArticle)
+    document.getElementById("add_art_btn").addEventListener('click', addArticle)
 
     // Remove Article Button
     document.getElementById("remove_art").addEventListener('click', () => {
@@ -168,7 +181,7 @@
             }
             for (let i = 0; i < mainData.articles.length; i++) {
                 let new_it = document.createElement('li')
-                let new_it_text = document.createTextNode(mainData.articles[i].title)
+                let new_it_text = document.createTextNode(getSlideTitle(mainData.articles[i].slides[0]))
                 new_it.appendChild(new_it_text)
                 new_it.value = i;
                 new_it.addEventListener('click', (e) => {
@@ -188,7 +201,7 @@
 
             updateSlidesList(update_current);
         } else {
-            makeNewArticle()
+            addArticle()
         }
     }
 
@@ -236,7 +249,7 @@
     }
 
     function updateSlide() {
-        document.getElementById("selected_image").src = (currentSlide.img.src === '') ? '' : `${path.join(working_path, currentSlide.img.src)}`
+        document.getElementById("selected_image").src = currentSlide.img.src
         document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
         document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
         document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
@@ -245,10 +258,14 @@
         makeBaseAndUpdate()
     }
 
-    function makeNewArticle() {
-        // Need to get a popup with the new title:
+    function addArticle(title) {
+        currentSlide = createSlideObj();
+        currentSlide.title = title;
+        currentArticle = { slides: [currentSlide] }
 
-        ipcRenderer.send('ask-title')
+        mainData.articles.push(currentArticle)
+
+        updateArticlesList(false);
     }
 
     function removeArticle() {
@@ -307,19 +324,19 @@
         updateSlidesList(false)
     }
 
-    function prevent_default(e){
+    function prevent_default(e) {
         e.preventDefault()
     }
 
-    function drop_handler(e, slide){
+    function drop_handler(e, slide) {
         e.preventDefault();
 
-        if(e.files.length > 0 && e.files[0].type.startsWith('image')){
+        if (e.files.length > 0 && e.files[0].type.startsWith('image')) {
             ((slide === undefined) ? currentSlide : slide).img.src = e.files[0].createObjectURL()
         } else {
             ((slide === undefined) ? currentSlide : slide).img.src = e.dataTransfer.getData("URL");
         }
-        if(slide !== currentSlide){
+        if (slide !== currentSlide) {
             updateImagePreview(currentSlide)
         }
     }
@@ -338,8 +355,20 @@
         ipcRenderer.send('save-request', mainData)
     }
 
+    function createCollectionObj() {
+        return {
+            articles: [{
+                slides: [createSlideObj()]
+            }]
+        }
+    }
+
     function createSlideObj() {
         return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null } }
+    }
+
+    function getSlideTitle(slide) {
+        return (slide.title === '') ? 'No Title' : slide.title
     }
 
     function clearChildren(el) {

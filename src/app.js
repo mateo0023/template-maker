@@ -155,7 +155,8 @@ ipcMain.handle('select-image', async () => {
         fs.renameSync(img_path, new_img_path)
     }
 
-    return { rel: `${path.relative(working_path, new_img_path)}`, abs: `${new_img_path}` }
+    // Until it is all HTML, don't send the relative path but move it out of the way
+    return { rel: new_img_path, abs: `${new_img_path}` }
 })
 
 // Get the control key - OS Dependent
