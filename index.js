@@ -1,7 +1,6 @@
 import { read } from "original-fs";
 import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
 (() => {
-    const { ipcRenderer } = require('electron');
     const AUTO_SAVE = false;
 
     // Main data object
@@ -39,37 +38,6 @@ import { updateImagePreview, getPosition, getCanvasObj } from "./image-processin
     // ************** END OF ONLY FOR DEBUGGING **************
     // *******************************************************
 
-    // ipcRenderer.on('file:opened', (e, data, path) => {
-    //     document.querySelector('body').hidden = false;
-
-    //     mainData = data
-    //     working_path = `${path}`
-
-    //     updateArticlesList();
-    // })
-
-    // ipcRenderer.on('file:save-request', (e, data) => {
-    //     saveProgressToObj();
-    //     e.sender.send('file:save-response', mainData);
-    //     updateArticlesList(false);
-    // })
-
-    // ipcRenderer.on('export-request', (event) => {
-    //     saveProgressToObj()
-    //     event.sender.send('export-response', mainData)
-    // })
-
-    // ipcRenderer.on('title-response', (e, result) => {
-    // addArticle(result)
-    // })
-
-    // ipcRenderer.on('make-article', addArticle)
-    // ipcRenderer.on('remove-article', removeArticle)
-    // ipcRenderer.on('make-slide', makeNewSlide)
-    // ipcRenderer.on('remove-slide', removeSlide)
-    // ipcRenderer.on('move-slide-up', moveSlideUp)
-    // ipcRenderer.on('move-slide-down', moveSlideDown)
-
     // When you change slide contents
     quill.on('text-change', () => {
         if (currentSlide) {
@@ -93,19 +61,6 @@ import { updateImagePreview, getPosition, getCanvasObj } from "./image-processin
             saveToFile();
         })
     }
-
-    // Image Selector Button
-    document.getElementById("image_selector").addEventListener('click', () => {
-        saveProgressToObj();
-        // ipcRenderer.invoke('select-image').then((result) => {
-        //     currentSlide.img.src = result.rel
-        //     document.getElementById("selected_image").src = result.abs
-        //     makeBaseAndUpdate()
-        //     if (AUTO_SAVE) {
-        //         saveToFile();
-        //     }
-        // })
-    })
 
     document.getElementById('canvas-container').addEventListener("dragover", (e) => {
         e.stopPropagation()
@@ -366,7 +321,7 @@ import { updateImagePreview, getPosition, getCanvasObj } from "./image-processin
 
     function saveToFile() {
         saveProgressToObj()
-        ipcRenderer.send('save-request', mainData)
+        window.localStorage.setItem('data', JSON.stringify(mainData))
     }
 
     function createCollectionObj() {
