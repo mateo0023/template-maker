@@ -1,5 +1,4 @@
-import { read } from "original-fs";
-import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
+// import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
 (() => {
     const AUTO_SAVE = false;
 
