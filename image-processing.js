@@ -53,7 +53,6 @@ function updateImagePreview(new_slide_obj) {
             }
 
             if (bkImageFabricGroup !== undefined) {
-                console.log(`About to add ${bkImageFabricGroup}`)
                 canvas.add(bkImageFabricGroup)
             }
             addTextToCanvas(new_slide_obj)
@@ -67,7 +66,7 @@ function updateImagePreview(new_slide_obj) {
             bkImageFabricGroup = undefined
             blBkImageFabric = undefined
             updateCanvas()
-        } else if (prevObj?.img?.src !== new_slide_obj.img.src) {
+        } else if (prevObj?.img.src !== new_slide_obj.img.src) {
             let async_counter = 2;
 
             // Will need to update both images
@@ -84,7 +83,7 @@ function updateImagePreview(new_slide_obj) {
                     updateCanvas()
                 }
             })
-        } else if (prevObj?.img?.reverse_fit !== new_slide_obj.img.reverse_fit) {
+        } else if (prevObj.img?.reverse_fit !== new_slide_obj.img.reverse_fit) {
             updateBkImageGroup(new_slide_obj, updateCanvas)
         } else {
             updateCanvas()
@@ -271,14 +270,17 @@ function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
                     }
                 }
 
-                if (typeof slide_obj.img?.top == 'number') {
-                    img.set({ 'top': slide_obj.img.top * SCALE });
+                if (typeof slide_obj.img?.top == 'number' && slide_obj.img.reverse_fit) {
+                    img.set({ 'top': slide_obj.img.top * SCALE, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
                 } else {
-                    img.set({ 'top': (IMAGE_HEIGHT * SCALE - img.getScaledHeight()) / 2 });
+                    img.set({ 'top': (IMAGE_HEIGHT * SCALE - img.getScaledHeight()) / 2, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
                 }
 
                 _callback(img)
             }
+        },
+        {
+            crossOrigin: 'anonymous'
         }
     )
 
@@ -296,18 +298,21 @@ function getBlurredBkImageFabric(slide_obj, _callback = (img) => { canvas.add(im
 
 // Will update the blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
 function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }) {
-    fabric.Image.fromURL(
-        slide_obj.img.src,
+    const html_img = document.createElement('img')
+    html_img.crossOrigin = "Anonymous"
+    html_img.addEventListener('load', 
         (img, err) => {
-            if (err) {
-                canvas.remove(blBkImageFabric)
-                blBkImageFabric = undefined;
-                throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
-            } else {
+            // if (err) {
+            //     if (blBkImageFabric !== undefined) {
+            //         canvas.remove(blBkImageFabric)
+            //     }
+            //     blBkImageFabric = undefined;
+            //     throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
+            // } else {
                 if (blBkImageFabric !== undefined) {
                     canvas.remove(blBkImageFabric)
                 }
-                blBkImageFabric = img
+                blBkImageFabric = new fabric.Image(html_img, { selectable: false })
 
                 if (blBkImageFabric.getScaledWidth() / blBkImageFabric.getScaledHeight() > 4.0 / 5) {
                     blBkImageFabric.scaleToHeight(canvas.getHeight())
@@ -323,11 +328,10 @@ function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }
                 blBkImageFabric.applyFilters()
 
                 _callback(blBkImageFabric)
-            }
+            // }
         },
-        {
-            selectable: false,
-        })
+        false)
+        html_img.src = slide_obj.img.src
 }
 
 // Makes the rounded-corner blue rectangle
