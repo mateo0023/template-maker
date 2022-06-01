@@ -51,3 +51,7 @@
 #sample-output-img {
     padding: 10px;
 }
+
+#output-img {
+    border: solid;
+}

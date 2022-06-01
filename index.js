@@ -23,19 +23,6 @@ const makeBaseAndUpdate = () => {
 
 updateArticlesList()
 
-// ******************************************************
-// ******************************************************
-// ***************** ONLY FOR DEBUGGING *****************
-// ******************************************************
-// ******************************************************
-document.getElementById("update-image").addEventListener('click', () => {
-    saveProgressToObj()
-    updateImagePreview(currentSlide)
-})
-// *******************************************************
-// ************** END OF ONLY FOR DEBUGGING **************
-// *******************************************************
-
 // When you change slide contents
 quill.on('text-change', () => {
     if (currentSlide) {
