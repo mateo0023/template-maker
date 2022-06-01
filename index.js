@@ -99,7 +99,7 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
         html_data.innerHTML = e.dataTransfer.getData('text/html')
         if (url.searchParams.has('imgurl')) {
             currentSlide.img.src = url.searchParams.get('imgurl')
-        } else if(html_data.getElementsByTagName('img')[0]?.src !== undefined){
+        } else if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
             currentSlide.img.src = html_data.getElementsByTagName('img')[0].src
         } else {
             currentSlide.img.src = url.href
@@ -240,7 +240,7 @@ function updateSlide() {
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
     slide_title.value = currentSlide.title;
     quill.setContents(currentSlide.content);
-    makeBaseAndUpdate()
+    updateImagePreview(currentSlide)
 }
 
 function addArticle(title) {

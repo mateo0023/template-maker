@@ -1,5 +1,4 @@
 // Requires Fabric.js to be defined
-// import { fabric } from "./lib/fabric.min.js";
 
 const canvas = new fabric.Canvas('output-img', {
     preserveObjectStacking: true
@@ -48,7 +47,8 @@ function updateImagePreview(new_slide_obj) {
         const updateCanvas = () => {
             canvas.clear()
             if (blBkImageFabric !== undefined &&
-                (new_slide_obj.img.hide_blr_bk === undefined || new_slide_obj.img.hide_blr_bk === false)) {
+                (new_slide_obj.img.hide_blr_bk === undefined || new_slide_obj.img.hide_blr_bk === false) &&
+                new_slide_obj.img.reverse_fit !== false) {
                 canvas.add(blBkImageFabric)
             }
 
@@ -270,7 +270,9 @@ function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
                     }
                 }
 
-                if (typeof slide_obj.img?.top == 'number' && slide_obj.img.reverse_fit) {
+                console.log(`top: ${slide_obj.img.top}\nReverse: ${slide_obj.img.reverse_fit}`)
+
+                if (slide_obj.img.top !== null && slide_obj.img.reverse_fit) {
                     img.set({ 'top': slide_obj.img.top * SCALE, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
                 } else {
                     img.set({ 'top': (IMAGE_HEIGHT * SCALE - img.getScaledHeight()) / 2, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
@@ -300,7 +302,7 @@ function getBlurredBkImageFabric(slide_obj, _callback = (img) => { canvas.add(im
 function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }) {
     const html_img = document.createElement('img')
     html_img.crossOrigin = "Anonymous"
-    html_img.addEventListener('load', 
+    html_img.addEventListener('load',
         (img, err) => {
             // if (err) {
             //     if (blBkImageFabric !== undefined) {
@@ -309,29 +311,29 @@ function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }
             //     blBkImageFabric = undefined;
             //     throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
             // } else {
-                if (blBkImageFabric !== undefined) {
-                    canvas.remove(blBkImageFabric)
-                }
-                blBkImageFabric = new fabric.Image(html_img, { selectable: false })
+            if (blBkImageFabric !== undefined) {
+                canvas.remove(blBkImageFabric)
+            }
+            blBkImageFabric = new fabric.Image(html_img, { selectable: false })
 
-                if (blBkImageFabric.getScaledWidth() / blBkImageFabric.getScaledHeight() > 4.0 / 5) {
-                    blBkImageFabric.scaleToHeight(canvas.getHeight())
-                } else {
-                    blBkImageFabric.scaleToWidth(canvas.getWidth())
-                }
-                blBkImageFabric.set({
-                    'top': (IMAGE_HEIGHT * SCALE - blBkImageFabric.getScaledHeight()) / 2,
-                    'left': (IMAGE_WIDTH * SCALE - blBkImageFabric.getScaledWidth()) / 2,
-                });
+            if (blBkImageFabric.getScaledWidth() / blBkImageFabric.getScaledHeight() > 4.0 / 5) {
+                blBkImageFabric.scaleToHeight(canvas.getHeight())
+            } else {
+                blBkImageFabric.scaleToWidth(canvas.getWidth())
+            }
+            blBkImageFabric.set({
+                'top': (IMAGE_HEIGHT * SCALE - blBkImageFabric.getScaledHeight()) / 2,
+                'left': (IMAGE_WIDTH * SCALE - blBkImageFabric.getScaledWidth()) / 2,
+            });
 
-                blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
-                blBkImageFabric.applyFilters()
+            blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
+            blBkImageFabric.applyFilters()
 
-                _callback(blBkImageFabric)
+            _callback(blBkImageFabric)
             // }
         },
         false)
-        html_img.src = slide_obj.img.src
+    html_img.src = slide_obj.img.src
 }
 
 // Makes the rounded-corner blue rectangle
