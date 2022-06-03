@@ -1,11 +1,13 @@
 // Requires Fabric.js to be defined
+// import { saveAs } from './lib/FileSaver.min.js';
 
 const canvas = new fabric.Canvas('output-img', {
-    preserveObjectStacking: true
+    preserveObjectStacking: true,
+    backgroundColor: 'white'
 });
 const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.15, clipName: 'blur' });
 
-const SCALE = canvas.getHeight() / 1350;
+canvas.SCALE = canvas.getHeight() / 1350;
 const CORNER_RADIUS = 43.2;
 const MARGIN = 47;
 const TXT_PADDING = MARGIN / 2;
@@ -13,107 +15,130 @@ const IMAGE_HEIGHT = 1350;
 const IMAGE_WIDTH = 1080;
 const MAX_RECT_WIDTH = IMAGE_WIDTH - MARGIN * 2
 
-var logo;
 fabric.Image.fromURL(
     './SolveIt Logo.png',
     img => {
-        img.scaleToHeight(31 * SCALE)
-        logo = img
+        img.scaleToHeight(31 * canvas.SCALE)
+        canvas.logo = img
     }, {
     selectable: false,
-    top: canvas.getHeight() - 31 * 1.5 * SCALE,
-    left: canvas.getWidth() - 31 * 1.5 * SCALE,
+    top: canvas.getHeight() - 31 * 1.5 * canvas.SCALE,
+    left: canvas.getWidth() - 31 * 1.5 * canvas.SCALE,
 })
 
 // FabricJs Object of the current image
-var bkImageFabricGroup;
+canvas.bkImageFabricGroup;
 // FabricJs Object of the current blurred background
-var blBkImageFabric;
+canvas.blBkImageFabric;
 // The FabricJS Object Containing the Title
-var title_txt_box;
+canvas.title_txt_box;
 // The FabricJS Object Containing the Contents of the slide
-var content_txt_box;
+canvas.content_txt_box;
 // The FabricJS Object Containing the Contents' Boxes
-var title_bounding_box
-var content_bounding_box;
-
-// Last object status
-var prevObj;
+canvas.title_bounding_box
+canvas.content_bounding_box;
 
 // This will update the image preview (no blur behind text)
-function updateImagePreview(new_slide_obj) {
+function updateImagePreview(slide_obj) { return createImage(canvas, slide_obj) }
+
+function createImage(_canvas, slide_obj) {
     return new Promise((res, rej) => {
-        // This will be done last, it is where the promise will be resolved
-        const updateCanvas = () => {
-            canvas.clear()
-            if (blBkImageFabric !== undefined &&
-                (new_slide_obj.img.hide_blr_bk === undefined || new_slide_obj.img.hide_blr_bk === false) &&
-                new_slide_obj.img.reverse_fit !== false) {
-                canvas.add(blBkImageFabric)
-            }
+        try {
+            // This will be done last, it is where the promise will be resolved
+            const updateCanvas = () => {
+                _canvas.clear()
+                _canvas.setBackgroundColor('white')
 
-            if (bkImageFabricGroup !== undefined) {
-                canvas.add(bkImageFabricGroup)
-            }
-            addTextToCanvas(new_slide_obj)
-
-            canvas.add(logo)
-
-            res(true)
-        };
-
-        if (new_slide_obj.img.src === '') {
-            bkImageFabricGroup = undefined
-            blBkImageFabric = undefined
-            updateCanvas()
-        } else if (prevObj?.img.src !== new_slide_obj.img.src) {
-            let async_counter = 2;
-
-            // Will need to update both images
-            updateBkImageGroup(new_slide_obj, () => {
-                async_counter--;
-                if (async_counter == 0) {
-                    updateCanvas()
+                if (_canvas.blBkImageFabric !== undefined &&
+                    (slide_obj.img.hide_blr_bk === undefined || slide_obj.img.hide_blr_bk === false) &&
+                    slide_obj.img.reverse_fit !== false) {
+                    _canvas.add(_canvas.blBkImageFabric)
                 }
-            })
 
-            updateBlBkImageFabric(new_slide_obj, () => {
-                async_counter--;
-                if (async_counter == 0) {
-                    updateCanvas()
+                if (_canvas.bkImageFabricGroup !== undefined) {
+                    _canvas.add(_canvas.bkImageFabricGroup)
                 }
-            })
-        } else if (prevObj.img?.reverse_fit !== new_slide_obj.img.reverse_fit) {
-            updateBkImageGroup(new_slide_obj, updateCanvas)
-        } else {
-            updateCanvas()
+                addTextToCanvas(_canvas, slide_obj)
+
+                if (_canvas.logo) {
+                    _canvas.add(_canvas.logo)
+                    res(_canvas)
+                } else {
+                    addNewLogoToCanvas(_canvas, () => { res(_canvas) })
+                }
+            };
+
+            if (slide_obj.img.src === '') {
+                _canvas.bkImageFabricGroup = undefined
+                _canvas.blBkImageFabric = undefined
+                updateCanvas()
+            } else {
+                let async_counter = 2;
+
+                // Will need to update both images
+                updateBkImageGroup(_canvas, slide_obj, () => {
+                    async_counter--;
+                    if (async_counter == 0) {
+                        updateCanvas()
+                    }
+                })
+
+                updateBlBkImageFabric(_canvas, slide_obj, () => {
+                    async_counter--;
+                    if (async_counter == 0) {
+                        updateCanvas()
+                    }
+                })
+            }
+        } catch (error) {
+            console.trace(error)
+            rej(error)
         }
-
-        prevObj = structuredClone(new_slide_obj)
     })
 
 }
 
-function loadFromJSON(slide_obj) {
-    if (slide_obj.fabric !== undefined) {
-        canvas.loadFromJSON(slide_obj.fabric)
-    } else {
-        updateImagePreview(slide_obj)
-    }
-}
-
-function exportSlideToFile(slide_obj) {
-    updateImagePreview(slide_obj).then(result => {
-        canvas.toDataURL({
+function exportSlideToFile(slide_obj, _callback = () => {}) {
+    const _canvas = createGhostCanvas()
+    createImage(_canvas, slide_obj).then(result => {
+        _callback(_canvas.toDataURL({
             format: 'jpeg',
-            multiplier: 1 / SCALE
-        })
+            multiplier: 1 / _canvas.SCALE
+        }))
     })
 
 }
 
-function getCanvasObj() {
-    return ""//JSON.stringify(canvas)
+function exportToZip(collection) {
+    var zip = new JSZip()
+
+    zip.file('collection.json', JSON.stringify(collection))
+
+    // Want to keep track of the callbacks.
+    // Since we add the ammount of articles (and remove them as we update it)
+    // it should only reach 0 once all slides have been computed (instead of at every single article)
+    let total_counter = collection.articles.length
+    for (const art of collection.articles) {
+        total_counter += art.slides.length - 1
+
+        const title = art.slides[0].title
+        for (let i = 0; i < art.slides.length; i++) {
+            exportSlideToFile(art.slides[i], uri => {
+                // This should be a constant value
+                var idx = uri.indexOf('base64,') + 'base64,'.length;
+                var content = uri.substring(idx);
+                zip.file(`${title}/${i}.jpeg`, content, { base64: true, createFolders: true })
+
+                total_counter--;
+                if (total_counter <= 0) {
+                    zip.generateAsync({ type: "blob" })
+                        .then((blob) => {
+                            saveAs(blob, "collection.zip");
+                        });
+                }
+            })
+        }
+    }
 }
 
 
@@ -123,50 +148,93 @@ function getCanvasObj() {
 // ***********************************************************************
 // ***********************************************************************
 
+
+function createGhostCanvas() {
+    const html_el = document.createElement('canvas')
+    html_el.width = IMAGE_WIDTH
+    html_el.height = IMAGE_HEIGHT
+    const _canvas = new fabric.Canvas(html_el, {
+        preserveObjectStacking: true,
+        backgroundColor: 'white'
+    })
+    _canvas.SCALE = 1
+
+    // FabricJs Object of the current image
+    _canvas.bkImageFabricGroup;
+    // FabricJs Object of the current blurred background
+    _canvas.blBkImageFabric;
+    // The FabricJS Object Containing the Title
+    _canvas.title_txt_box;
+    // The FabricJS Object Containing the Contents of the slide
+    _canvas.content_txt_box;
+    // The FabricJS Object Containing the Contents' Boxes
+    _canvas.title_bounding_box
+    _canvas.content_bounding_box;
+
+    return _canvas;
+}
+
+function addNewLogoToCanvas(_canvas, _callback){
+    fabric.Image.fromURL(
+        './SolveIt Logo.png',
+        img => {
+            img.scaleToHeight(31 * _canvas.SCALE)
+            _canvas.logo = img
+
+            _canvas.add(img)
+
+            _callback(img)
+        }, {
+        selectable: false,
+        top: _canvas.getHeight() - 31 * 1.5 * _canvas.SCALE,
+        left: _canvas.getWidth() - 31 * 1.5 * _canvas.SCALE,
+    })
+}
+
 // Will process all text and textboxes and add them to the Canvas
-function addTextToCanvas(slide_obj, _callback = addExistingTxtToCanvas) {
+function addTextToCanvas(_canvas = canvas, slide_obj) {
 
-    if (title_bounding_box !== null && title_bounding_box !== undefined) {
-        canvas.remove(title_bounding_box);
+    if (_canvas.title_bounding_box !== null && _canvas.title_bounding_box !== undefined) {
+        _canvas.remove(_canvas.title_bounding_box);
     }
-    if (content_bounding_box !== null && content_bounding_box !== undefined) {
-        canvas.remove(content_bounding_box);
+    if (_canvas.content_bounding_box !== null && _canvas.content_bounding_box !== undefined) {
+        _canvas.remove(_canvas.content_bounding_box);
     }
-    if (title_txt_box !== null && title_txt_box !== undefined) {
-        canvas.remove(title_txt_box)
+    if (_canvas.title_txt_box !== null && _canvas.title_txt_box !== undefined) {
+        _canvas.remove(_canvas.title_txt_box)
     }
-    if (content_txt_box !== null && content_txt_box !== undefined) {
-        canvas.remove(content_txt_box)
+    if (_canvas.content_txt_box !== null && _canvas.content_txt_box !== undefined) {
+        _canvas.remove(_canvas.content_txt_box)
     }
 
-    title_txt_box = fabricMakeTitleText(slide_obj.title)
-    content_txt_box = processContent(slide_obj.content)
-    if (title_txt_box === null) {
-        title_bounding_box = null
+    _canvas.title_txt_box = fabricMakeTitleText(_canvas, slide_obj.title)
+    _canvas.content_txt_box = processContent(_canvas, slide_obj.content)
+    if (_canvas.title_txt_box === null) {
+        _canvas.title_bounding_box = null
     } else {
-        title_bounding_box = fabricMakeRect(
-            MARGIN * SCALE, MARGIN * SCALE,
-            MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+        _canvas.title_bounding_box = fabricMakeRect(_canvas,
+            MARGIN * _canvas.SCALE, MARGIN * _canvas.SCALE,
+            MAX_RECT_WIDTH * _canvas.SCALE, _canvas.title_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)
     }
-    if (content_txt_box === null) {
-        content_bounding_box = null
+    if (_canvas.content_txt_box === null) {
+        _canvas.content_bounding_box = null
     } else {
-        content_bounding_box = fabricMakeRect(
-            MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
-            MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)
+        _canvas.content_bounding_box = fabricMakeRect(_canvas,
+            MARGIN * _canvas.SCALE, _canvas.content_txt_box.top - TXT_PADDING * _canvas.SCALE,
+            MAX_RECT_WIDTH * _canvas.SCALE, _canvas.content_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)
     }
 
-    if (bkImageFabricGroup !== undefined && (title_txt_box !== null || content_txt_box !== null)) {
-        bkImageFabricGroup._objects[1].clipPath = new fabric.Group(
+    if (_canvas.bkImageFabricGroup !== undefined && (_canvas.title_txt_box !== null || _canvas.content_txt_box !== null)) {
+        _canvas.bkImageFabricGroup._objects[1].clipPath = new fabric.Group(
             [
                 // Title Box
-                ...((title_txt_box === null) ? [] : [fabricMakeRect(
-                    MARGIN * SCALE, MARGIN * SCALE,
-                    MAX_RECT_WIDTH * SCALE, title_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)]),
+                ...((_canvas.title_txt_box === null) ? [] : [fabricMakeRect(_canvas,
+                    MARGIN * _canvas.SCALE, MARGIN * _canvas.SCALE,
+                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.title_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)]),
                 // Content Box
-                ...((content_txt_box === null) ? [] : [fabricMakeRect(
-                    MARGIN * SCALE, content_txt_box.top - TXT_PADDING * SCALE,
-                    MAX_RECT_WIDTH * SCALE, content_txt_box.calcTextHeight() + TXT_PADDING * 2 * SCALE)])
+                ...((_canvas.content_txt_box === null) ? [] : [fabricMakeRect(_canvas,
+                    MARGIN * _canvas.SCALE, _canvas.content_txt_box.top - TXT_PADDING * _canvas.SCALE,
+                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.content_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)])
             ],
             {
                 absolutePositioned: true
@@ -174,39 +242,36 @@ function addTextToCanvas(slide_obj, _callback = addExistingTxtToCanvas) {
         )
     }
 
-    if (title_bounding_box !== null && title_bounding_box !== undefined) {
-        canvas.add(title_bounding_box);
+    if (_canvas.title_bounding_box !== null && _canvas.title_bounding_box !== undefined) {
+        _canvas.add(_canvas.title_bounding_box);
     }
-    if (content_bounding_box !== null && content_bounding_box !== undefined) {
-        canvas.add(content_bounding_box);
+    if (_canvas.content_bounding_box !== null && _canvas.content_bounding_box !== undefined) {
+        _canvas.add(_canvas.content_bounding_box);
     }
-    if (title_txt_box !== null && title_txt_box !== undefined) {
-        canvas.add(title_txt_box)
+    if (_canvas.title_txt_box !== null && _canvas.title_txt_box !== undefined) {
+        _canvas.add(_canvas.title_txt_box)
     }
-    if (content_txt_box !== null && content_txt_box !== undefined) {
-        canvas.add(content_txt_box)
+    if (_canvas.content_txt_box !== null && _canvas.content_txt_box !== undefined) {
+        _canvas.add(_canvas.content_txt_box)
     }
-}
-
-function addExistingTxtToCanvas() {
 }
 
 // Returns the vertical position of the Top image
-function getPosition() {
+function getPosition(_canvas = canvas) {
     // If it's not defined or it's at default "top" position, return null
-    if (bkImageFabricGroup === undefined
+    if (_canvas.bkImageFabricGroup === undefined
         ||
-        bkImageFabricGroup.top === (IMAGE_HEIGHT * SCALE - bkImageFabricGroup.getScaledHeight()) / 2) {
+        _canvas.bkImageFabricGroup.top === (IMAGE_HEIGHT * _canvas.SCALE - _canvas.bkImageFabricGroup.getScaledHeight()) / 2) {
         return null;
     }
-    return bkImageFabricGroup.top / SCALE
+    return _canvas.bkImageFabricGroup.top / _canvas.SCALE
 }
 
-function updateBkImageGroup(slide_obj, _callback = (group) => { canvas.add(group) }) {
+function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.add(group) }) {
     const images = {}
 
     const lastPart = () => {
-        bkImageFabricGroup = new fabric.Group(
+        _canvas.bkImageFabricGroup = new fabric.Group(
             [
                 images.non_blurred, images.blurred
             ],
@@ -226,12 +291,12 @@ function updateBkImageGroup(slide_obj, _callback = (group) => { canvas.add(group
             }
         )
 
-        _callback(bkImageFabricGroup)
+        _callback(_canvas.bkImageFabricGroup)
     }
 
     let async_counter = 2;
 
-    getBkImageFabric(slide_obj, (img) => {
+    getBkImageFabric(_canvas, slide_obj, (img) => {
         images.non_blurred = img
         async_counter--;
         if (async_counter == 0) {
@@ -239,7 +304,7 @@ function updateBkImageGroup(slide_obj, _callback = (group) => { canvas.add(group
         }
     })
 
-    getBlurredBkImageFabric(slide_obj, (img) => {
+    getBlurredBkImageFabric(_canvas, slide_obj, (img) => {
         images.blurred = img
         async_counter--;
         if (async_counter == 0) {
@@ -249,7 +314,7 @@ function updateBkImageGroup(slide_obj, _callback = (group) => { canvas.add(group
 }
 
 // Will create an image, scale it properly and pass it to the callback
-function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
+function getBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(img) }) {
     fabric.Image.fromURL(
         slide_obj.img.src,
         (img, err) => {
@@ -258,24 +323,22 @@ function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
             } else {
                 if (slide_obj.img?.reverse_fit) {
                     if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
-                        img.scaleToWidth(canvas.getWidth())
+                        img.scaleToWidth(_canvas.getWidth())
                     } else {
-                        img.scaleToHeight(canvas.getHeight())
+                        img.scaleToHeight(_canvas.getHeight())
                     }
                 } else {
                     if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
-                        img.scaleToHeight(canvas.getHeight())
+                        img.scaleToHeight(_canvas.getHeight())
                     } else {
-                        img.scaleToWidth(canvas.getWidth())
+                        img.scaleToWidth(_canvas.getWidth())
                     }
                 }
 
-                console.log(`top: ${slide_obj.img.top}\nReverse: ${slide_obj.img.reverse_fit}`)
-
                 if (slide_obj.img.top !== null && slide_obj.img.reverse_fit) {
-                    img.set({ 'top': slide_obj.img.top * SCALE, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
+                    img.set({ 'top': slide_obj.img.top * _canvas.SCALE, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
                 } else {
-                    img.set({ 'top': (IMAGE_HEIGHT * SCALE - img.getScaledHeight()) / 2, 'left': (canvas.getWidth() - img.getScaledWidth()) / 2 });
+                    img.set({ 'top': (IMAGE_HEIGHT * _canvas.SCALE - img.getScaledHeight()) / 2, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
                 }
 
                 _callback(img)
@@ -289,8 +352,8 @@ function getBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
 }
 
 // Will pass a slighly blurred image to the callback function
-function getBlurredBkImageFabric(slide_obj, _callback = (img) => { canvas.add(img) }) {
-    getBkImageFabric(slide_obj, (img) => {
+function getBlurredBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(img) }) {
+    getBkImageFabric(_canvas, slide_obj, (img) => {
         img.filters.push(smallBkBlur)
         img.applyFilters()
 
@@ -298,100 +361,92 @@ function getBlurredBkImageFabric(slide_obj, _callback = (img) => { canvas.add(im
     })
 }
 
-// Will update the blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
-function updateBlBkImageFabric(slide_obj, _callback = img => { canvas.add(img) }) {
+// Will update the _canvas.blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
+function updateBlBkImageFabric(_canvas, slide_obj, _callback = img => { canvas.add(img) }) {
     const html_img = document.createElement('img')
     html_img.crossOrigin = "Anonymous"
     html_img.addEventListener('load',
         (img, err) => {
-            // if (err) {
-            //     if (blBkImageFabric !== undefined) {
-            //         canvas.remove(blBkImageFabric)
-            //     }
-            //     blBkImageFabric = undefined;
-            //     throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
-            // } else {
-            if (blBkImageFabric !== undefined) {
-                canvas.remove(blBkImageFabric)
+            if (_canvas.blBkImageFabric !== undefined) {
+                _canvas.remove(_canvas.blBkImageFabric)
             }
-            blBkImageFabric = new fabric.Image(html_img, { selectable: false })
+            _canvas.blBkImageFabric = new fabric.Image(html_img, { selectable: false })
 
-            if (blBkImageFabric.getScaledWidth() / blBkImageFabric.getScaledHeight() > 4.0 / 5) {
-                blBkImageFabric.scaleToHeight(canvas.getHeight())
+            if (_canvas.blBkImageFabric.getScaledWidth() / _canvas.blBkImageFabric.getScaledHeight() > 4.0 / 5) {
+                _canvas.blBkImageFabric.scaleToHeight(_canvas.getHeight())
             } else {
-                blBkImageFabric.scaleToWidth(canvas.getWidth())
+                _canvas.blBkImageFabric.scaleToWidth(_canvas.getWidth())
             }
-            blBkImageFabric.set({
-                'top': (IMAGE_HEIGHT * SCALE - blBkImageFabric.getScaledHeight()) / 2,
-                'left': (IMAGE_WIDTH * SCALE - blBkImageFabric.getScaledWidth()) / 2,
+            _canvas.blBkImageFabric.set({
+                'top': (IMAGE_HEIGHT * _canvas.SCALE - _canvas.blBkImageFabric.getScaledHeight()) / 2,
+                'left': (IMAGE_WIDTH * _canvas.SCALE - _canvas.blBkImageFabric.getScaledWidth()) / 2,
             });
 
-            blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
-            blBkImageFabric.applyFilters()
+            _canvas.blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
+            _canvas.blBkImageFabric.applyFilters()
 
-            _callback(blBkImageFabric)
-            // }
+            _callback(_canvas.blBkImageFabric)
         },
         false)
     html_img.src = slide_obj.img.src
 }
 
 // Makes the rounded-corner blue rectangle
-function fabricMakeRect(x, y, width, height) {
+function fabricMakeRect(_canvas, x, y, width, height) {
     return new fabric.Rect({
         left: x,
         top: y,
         width: width,
         height: height,
         fill: `rgba(44, 109, 195, 0.62)`,
-        rx: CORNER_RADIUS * SCALE,
-        ry: CORNER_RADIUS * SCALE,
+        rx: CORNER_RADIUS * _canvas.SCALE,
+        ry: CORNER_RADIUS * _canvas.SCALE,
         selectable: false,
     })
 }
 
-function fabricMakeTitleText(text) {
+function fabricMakeTitleText(_canvas, text) {
     if (text === undefined || text === null || text === '') {
         return null
     }
     return new fabric.Textbox(text, {
         // Will need to adjust positions
-        left: MARGIN * 1.5 * SCALE,
-        top: MARGIN * 1.5 * SCALE,
+        left: MARGIN * 1.5 * _canvas.SCALE,
+        top: MARGIN * 1.5 * _canvas.SCALE,
         fill: 'white',
         fontFamily: "Celebes",
         fontWeight: 'bold',
         fontStyle: 'italic',
-        fontSize: 77 * SCALE,
+        fontSize: 77 * _canvas.SCALE,
         textAlign: 'center',
         // Color, horizontal offset, vertical offest, blur radius
-        shadow: `rgba(0,0,0,0.6) ${0.92705 * SCALE}px ${2.853 * SCALE}px ${5 * SCALE}px`,
-        width: (MAX_RECT_WIDTH - MARGIN) * SCALE,
+        shadow: `rgba(0,0,0,0.6) ${0.92705 * _canvas.SCALE}px ${2.853 * _canvas.SCALE}px ${5 * _canvas.SCALE}px`,
+        width: (MAX_RECT_WIDTH - MARGIN) * _canvas.SCALE,
         lineHeight: 0.9,
         selectable: false
     })
 }
 
-function fabricMakeContentText(text) {
+function fabricMakeContentText(_canvas, text) {
     if (text === undefined || text === null || text === '') {
         return null
     }
     text = text.replace(/\n*$/, '')
 
     const txt_box = new fabric.Textbox(text, {
-        left: MARGIN * 1.5 * SCALE,
+        left: MARGIN * 1.5 * _canvas.SCALE,
         fill: 'white',
         fontFamily: "Celebes",
         textAlign: 'left',
         // Color, horizontal offset, vertical offest, blur radius
-        shadow: `rgba(0,0,0,0.6) ${0.92705 * SCALE}px ${2.853 * SCALE}px ${5 * SCALE}px`,
-        width: (MAX_RECT_WIDTH - MARGIN) * SCALE,
-        fontSize: 50 * SCALE,
+        shadow: `rgba(0,0,0,0.6) ${0.92705 * _canvas.SCALE}px ${2.853 * _canvas.SCALE}px ${5 * _canvas.SCALE}px`,
+        width: (MAX_RECT_WIDTH - MARGIN) * _canvas.SCALE,
+        fontSize: 50 * _canvas.SCALE,
         lineHeight: 1,
         selectable: false
     })
 
-    txt_box.top = (IMAGE_HEIGHT - MARGIN * 1.5) * SCALE - txt_box.calcTextHeight();
+    txt_box.top = (IMAGE_HEIGHT - MARGIN * 1.5) * _canvas.SCALE - txt_box.calcTextHeight();
     return txt_box
 }
 
@@ -402,7 +457,7 @@ function fabricMakeContentText(text) {
 // ***********************************************************************
 // ***********************************************************************
 
-function processContent(content_obj) {
+function processContent(_canvas, content_obj) {
     let text = ""
     const bold_ranges = new Array()
     const italic_ranges = new Array()
@@ -450,7 +505,7 @@ function processContent(content_obj) {
         return null
     }
 
-    const fabric_text = fabricMakeContentText(text)
+    const fabric_text = fabricMakeContentText(_canvas, text)
 
     for (var i = 0; i < bold_ranges.length; i++) {
         fabric_text.setSelectionStyles({
@@ -488,8 +543,6 @@ function checkIfIsBullet(list, start_idx) {
 
 export {
     updateImagePreview,
-    exportSlideToFile,
     getPosition,
-    getCanvasObj,
-    loadFromJSON
+    exportToZip
 }

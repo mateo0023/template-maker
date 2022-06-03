@@ -15,6 +15,8 @@
 
     <script defer type="module" src="./lib/quill/quill.min.js"></script>
     <script defer src="./lib/fabric.min.js"></script>
+    <script defer src="./lib/jszip.min.js"></script>
+    <script defer src="./lib/FileSaver.min.js"></script>
     <script defer type="module" src="./image-processing.js"></script>
     <script defer type="module" src="./index.js"></script>
 </head>
@@ -22,6 +24,7 @@
 <body>
     <div class="header">
         <button id="save-progress">Save Progress</button>
+        <button id="export-btn">Export Images</button>
     </div>
     <div class="global-container">
         <div id="lists_container">
@@ -52,10 +55,10 @@
         </div>
         <div class="main">
             <div>
-                <div style="vertical-align: middle">
+                <!-- <div style="vertical-align: middle">
                     <button id="image_selector"><img src="" alt="Select Image"
                             style="max-width: 150px;max-height: 150px;" id="selected_image"></button>
-                </div>
+                </div> -->
                 <div>
                     <input type="checkbox" name="invert_fit" value="" id="inverse-fit-checkbox" />
                     <label for="invert_fit">Smaller fit (shrink to fit)</label>
@@ -84,10 +87,29 @@
             </div>
         </div>
         <div>
+            <p>Drag and drop images to load them</p>
             <div id="canvas-container">
                 <canvas src="" id="output-img" alt="" width="360px"
                     height="450px" draggable="true">
                 </canvas>
+            </div>
+        </div>
+    </div>
+
+    <div>
+        <div id="policyNotice" class="light display-right" style="display: none;">
+            <div id="closeIcon" style="display: none;">
+            </div>
+            <div class="title-wrap">
+                <h4>Usage Policy Consent</h4>
+            </div>
+            <div class="content-wrap">
+                <div class="msg-wrap">
+                    <p>Images produced by this website are property of SolveIt News Inc.</p>
+                    <div class="btn-wrap">
+                        <button id="acknowledge-btn">Accept</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -39,7 +39,7 @@
 
 .global-container>* {
     flex-basis: 500px;
-    flex: 1 0;
+    /* flex: 1 0; */
     margin: 0 auto 0 auto;
 }
 
@@ -54,4 +54,12 @@
 
 #output-img {
     border: solid;
+}
+
+#policyNotice {
+    display: inline;
+    border: 2px solid #ccc !important;
+    border-radius: 16px;
+    padding: 16px;
+    background-color: aqua;
 }

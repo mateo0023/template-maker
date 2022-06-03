@@ -1,5 +1,5 @@
-import { updateImagePreview, getPosition, getCanvasObj } from "./image-processing.js"
-const AUTO_SAVE = false;
+import { updateImagePreview, getPosition, exportToZip } from "./image-processing.js"
+const AUTO_SAVE = true;
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -32,6 +32,26 @@ quill.on('text-change', () => {
 
 document.getElementById('save-progress').addEventListener('click', saveToBrowser)
 
+document.getElementById('export-btn').addEventListener('click', (e) => {
+    saveToBrowser()
+    exportToZip(mainData)
+})
+
+{
+    const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
+    if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
+        document.getElementById("policyNotice").style.display = "block";
+    } else {
+        document.getElementById("policyNotice").style.display = "none";
+    }
+    
+    document.getElementById('acknowledge-btn').addEventListener('click', () => {
+        const now = new Date()
+        now.setMonth(now.getMonth() + 1)
+        window.localStorage.setItem('accepted-terms-expiration', now.toString())
+        document.getElementById("policyNotice").style.display = "none";
+    })
+}
 // Title input
 document.getElementById('slide_title').addEventListener('input', (e) => {
     currentSlide.title = e.target.value;
@@ -59,12 +79,6 @@ document.getElementById('canvas-container').addEventListener("dragover", (e) => 
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
     e.stopPropagation()
     e.preventDefault()
-    console.log("Data Dropped")
-    // for(const key of e.dataTransfer.items){
-    //     console.log(key.type)
-    //     console.log(e.dataTransfer.getData(key.type))
-    //     console.log("")
-    // }
 
     if (e.dataTransfer.files.length && e.dataTransfer.files[0]?.type?.startsWith('image/') && e.dataTransfer.files[0]?.type !== "image/bmp") {
         const reader = new FileReader()
@@ -73,12 +87,8 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
             // convert image file to base64 string
             currentSlide.img.src = reader.result;
             updateImagePreview(currentSlide)
-
-            // Debugging
-            document.getElementById('selected_image').src = currentSlide.img.src
         }, false);
 
-        console.log(e.dataTransfer.getData("URL"))
         reader.readAsDataURL(e.dataTransfer.files[0])
     } else {
         const url = new URL(e.dataTransfer.getData("URL"));
@@ -91,8 +101,6 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
         } else {
             currentSlide.img.src = url.href
         }
-        console.log(currentSlide.img.src)
-        document.getElementById('selected_image').src = currentSlide.img.src
     }
 })
 
@@ -221,7 +229,6 @@ function updateSlidesList(update_current = true) {
 }
 
 function updateSlide() {
-    document.getElementById("selected_image").src = currentSlide.img.src
     document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
@@ -319,7 +326,7 @@ function saveProgressToObj() {
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
     currentSlide.img.top = getPosition()
-    currentSlide.fabric = getCanvasObj()
+    // currentSlide.fabric = getCanvasObj()
 }
 
 function saveToBrowser() {
