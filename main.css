@@ -1,3 +1,7 @@
+body {
+    font-family: 'Celebes';
+}
+
 .selected {
     font-weight: bold;
 }
