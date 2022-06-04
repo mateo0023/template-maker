@@ -44,7 +44,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
     } else {
         document.getElementById("policyNotice").style.display = "none";
     }
-    
+
     document.getElementById('acknowledge-btn').addEventListener('click', () => {
         const now = new Date()
         now.setMonth(now.getMonth() + 1)
@@ -69,39 +69,12 @@ if (AUTO_SAVE) {
     })
 }
 
-document.getElementById('canvas-container').addEventListener("dragover", (e) => {
-    e.stopPropagation()
-    e.preventDefault()
-
-    e.dataTransfer.dropEffect = "move";
-})
+document.getElementById('canvas-container').addEventListener("dragover", draggoverHandler)
 
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
-    e.stopPropagation()
-    e.preventDefault()
-
-    if (e.dataTransfer.files.length && e.dataTransfer.files[0]?.type?.startsWith('image/') && e.dataTransfer.files[0]?.type !== "image/bmp") {
-        const reader = new FileReader()
-
-        reader.addEventListener("load", function () {
-            // convert image file to base64 string
-            currentSlide.img.src = reader.result;
-            updateImagePreview(currentSlide)
-        }, false);
-
-        reader.readAsDataURL(e.dataTransfer.files[0])
-    } else {
-        const url = new URL(e.dataTransfer.getData("URL"));
-        const html_data = document.createElement('div')
-        html_data.innerHTML = e.dataTransfer.getData('text/html')
-        if (url.searchParams.has('imgurl')) {
-            currentSlide.img.src = url.searchParams.get('imgurl')
-        } else if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
-            currentSlide.img.src = html_data.getElementsByTagName('img')[0].src
-        } else {
-            currentSlide.img.src = url.href
-        }
-    }
+    dropHandler(e, currentSlide).then(slide => {
+        updateImagePreview(slide)
+    })
 })
 
 // Invert Image Checkbox
@@ -150,6 +123,50 @@ document.getElementById('move_slide_up').addEventListener('click', () => {
 document.getElementById('move_slide_down').addEventListener('click', () => {
     moveSlideDown()
 })
+
+
+function draggoverHandler(e) {
+    e.stopPropagation()
+    e.preventDefault()
+
+    e.dataTransfer.dropEffect = "move";
+}
+
+// Returns a promise that resolves with the updated slide
+function dropHandler(e, slide = currentSlide) {
+    return new Promise((resolve, reject) => {
+        e.stopPropagation()
+        e.preventDefault()
+
+        try {
+            if (e.dataTransfer.files.length && e.dataTransfer.files[0]?.type?.startsWith('image/') && e.dataTransfer.files[0]?.type !== "image/bmp") {
+                const reader = new FileReader()
+
+                reader.addEventListener("load", function () {
+                    // convert image file to base64 string
+                    slide.img.src = reader.result;
+                    resolve(slide)
+                }, false);
+
+                reader.readAsDataURL(e.dataTransfer.files[0])
+            } else {
+                const url = new URL(e.dataTransfer.getData("URL"));
+                const html_data = document.createElement('div')
+                html_data.innerHTML = e.dataTransfer.getData('text/html')
+                if (url.searchParams.has('imgurl')) {
+                    slide.img.src = url.searchParams.get('imgurl')
+                } else if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
+                    slide.img.src = html_data.getElementsByTagName('img')[0].src
+                } else {
+                    slide.img.src = url.href
+                }
+                resolve(slide)
+            }
+        } catch (err) {
+            reject(err)
+        }
+    })
+}
 
 function updateArticlesList(update_current = true) {
     let list = document.getElementById("articles_list");
@@ -213,10 +230,17 @@ function updateSlidesList(update_current = true) {
             updateSlide();
         })
 
-        new_it.draggable = true;
+        new_it.setAttribute("draggable", "true")
 
-        new_it.addEventListener('ondragover', e => { prevent_default(e, slide) })
-        new_it.addEventListener('ondrop', e => { drop_handler(e, slide) })
+        new_it.addEventListener('dragover', draggoverHandler, false)
+
+        new_it.addEventListener('drop', e => {
+            dropHandler(e, slide).then(updated_slide => {
+                if (updated_slide === currentSlide) {
+                    updateImagePreview(updated_slide)
+                }
+            })
+        }, false)
 
         if (currentArticle.slides[i] === currentSlide) {
             curr_slide_list_item = new_it

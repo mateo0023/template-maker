@@ -92,7 +92,6 @@ function createImage(_canvas, slide_obj) {
                 })
             }
         } catch (error) {
-            console.trace(error)
             rej(error)
         }
     })
@@ -270,8 +269,7 @@ function getPosition(_canvas = canvas) {
 }
 
 function getWidth(_canvas = canvas) {
-    // If it's not defined or it's at default "top" position, return null
-    console.log(`ImageWidth: ${_canvas.bkImageFabricGroup?._objects[0]?.getScaledWidth()}\nCanvas:${_canvas.getWidth()}`)
+    // If it's not defined or it's greater than the canvas-width, return null
     if (_canvas.bkImageFabricGroup === undefined
         ||
         _canvas.bkImageFabricGroup.getScaledWidth() >= _canvas.getWidth()) {
@@ -345,8 +343,6 @@ function getBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(
             } else {
                 if (slide_obj.img?.reverse_fit === true &&
                     slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
-                    // console.trace(slide_obj.img)
-                    // getWidth()
                     img.scaleToWidth(slide_obj.img.width * _canvas.SCALE)
                 } else if (slide_obj.img?.reverse_fit) {
                     if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
