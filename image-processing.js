@@ -98,7 +98,7 @@ function createImage(_canvas, slide_obj) {
 
 }
 
-function exportSlideToFile(slide_obj, _callback = () => {}) {
+function exportSlideToFile(slide_obj, _callback = () => { }) {
     const _canvas = createGhostCanvas()
     createImage(_canvas, slide_obj).then(result => {
         _callback(_canvas.toDataURL({
@@ -174,7 +174,7 @@ function createGhostCanvas() {
     return _canvas;
 }
 
-function addNewLogoToCanvas(_canvas, _callback){
+function addNewLogoToCanvas(_canvas, _callback) {
     fabric.Image.fromURL(
         './SolveIt Logo.png',
         img => {
@@ -472,7 +472,12 @@ function processContent(_canvas, content_obj) {
 
         if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
             prev_bullet_idx = new_bullet_idx
-            temp_txt = "• " + content_obj.ops[i].insert
+            
+            // Make sure that to add the bullet to the last line of the text item
+            const lines = content_obj.ops[i].insert.split('\n')
+            lines[lines.length-1] = "• " + lines[lines.length-1]
+
+            temp_txt = lines.join('\n')
         } else {
             temp_txt = content_obj.ops[i].insert
         }
