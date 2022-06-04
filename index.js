@@ -1,4 +1,4 @@
-import { updateImagePreview, getPosition, exportToZip } from "./image-processing.js"
+import { updateImagePreview, getPosition, getWidth, exportToZip } from "./image-processing.js"
 const AUTO_SAVE = true;
 
 // Main data object
@@ -114,7 +114,7 @@ document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) =
     }
 })
 
-// Invert Image Checkbox
+// Hide Background Image Checkbox
 document.getElementById('hide-blurred-background-checkbox').addEventListener('change', (e) => {
     currentSlide.img.hide_blr_bk = e.target.checked
     makeBaseAndUpdate()
@@ -326,6 +326,7 @@ function saveProgressToObj() {
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
     currentSlide.img.top = getPosition()
+    currentSlide.img.width = getWidth()
     // currentSlide.fabric = getCanvasObj()
 }
 
@@ -343,7 +344,7 @@ function createCollectionObj() {
 }
 
 function createSlideObj() {
-    return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null } }
+    return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null, width: null } }
 }
 
 function getSlideTitle(slide) {

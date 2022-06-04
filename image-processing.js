@@ -3,7 +3,8 @@
 
 const canvas = new fabric.Canvas('output-img', {
     preserveObjectStacking: true,
-    backgroundColor: 'white'
+    backgroundColor: 'white',
+    uniformScaling: true,
 });
 const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.15, clipName: 'blur' });
 
@@ -155,7 +156,8 @@ function createGhostCanvas() {
     html_el.height = IMAGE_HEIGHT
     const _canvas = new fabric.Canvas(html_el, {
         preserveObjectStacking: true,
-        backgroundColor: 'white'
+        backgroundColor: 'white',
+        uniformScaling: true,
     })
     _canvas.SCALE = 1
 
@@ -267,6 +269,17 @@ function getPosition(_canvas = canvas) {
     return _canvas.bkImageFabricGroup.top / _canvas.SCALE
 }
 
+function getWidth(_canvas = canvas) {
+    // If it's not defined or it's at default "top" position, return null
+    console.log(`ImageWidth: ${_canvas.bkImageFabricGroup?._objects[0]?.getScaledWidth()}\nCanvas:${_canvas.getWidth()}`)
+    if (_canvas.bkImageFabricGroup === undefined
+        ||
+        _canvas.bkImageFabricGroup.getScaledWidth() >= _canvas.getWidth()) {
+        return null;
+    }
+    return _canvas.bkImageFabricGroup.getScaledWidth() / _canvas.SCALE
+}
+
 function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.add(group) }) {
     const images = {}
 
@@ -278,11 +291,12 @@ function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.
             {
                 ...((slide_obj.img.reverse_fit) ?
                     {
+                        lockScalingFlip: true,
                         lockRotation: true,
                         lockMovementX: true,
                         centeredScaling: true,
                         lockSkewingX: true,
-                        lockSkewingY: true
+                        lockSkewingY: true,
                     }
                     :
                     { selectable: false }
@@ -290,6 +304,14 @@ function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.
                 objectCaching: false
             }
         )
+
+        _canvas.bkImageFabricGroup.setControlsVisibility({
+            mb: false,
+            ml: false,
+            mr: false,
+            mt: false,
+            mtr: false,
+        })
 
         _callback(_canvas.bkImageFabricGroup)
     }
@@ -321,7 +343,12 @@ function getBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(
             if (err) {
                 throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
             } else {
-                if (slide_obj.img?.reverse_fit) {
+                if (slide_obj.img?.reverse_fit === true &&
+                    slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
+                    // console.trace(slide_obj.img)
+                    // getWidth()
+                    img.scaleToWidth(slide_obj.img.width * _canvas.SCALE)
+                } else if (slide_obj.img?.reverse_fit) {
                     if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
                         img.scaleToWidth(_canvas.getWidth())
                     } else {
@@ -472,10 +499,10 @@ function processContent(_canvas, content_obj) {
 
         if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
             prev_bullet_idx = new_bullet_idx
-            
+
             // Make sure that to add the bullet to the last line of the text item
             const lines = content_obj.ops[i].insert.split('\n')
-            lines[lines.length-1] = "• " + lines[lines.length-1]
+            lines[lines.length - 1] = "• " + lines[lines.length - 1]
 
             temp_txt = lines.join('\n')
         } else {
@@ -549,5 +576,6 @@ function checkIfIsBullet(list, start_idx) {
 export {
     updateImagePreview,
     getPosition,
+    getWidth,
     exportToZip
 }
