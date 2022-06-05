@@ -58,21 +58,7 @@
             </div>
         </div>
         <div class="main">
-            <div>
-                <!-- <div style="vertical-align: middle">
-                    <button id="image_selector"><img src="" alt="Select Image"
-                            style="max-width: 150px;max-height: 150px;" id="selected_image"></button>
-                </div> -->
-                <div>
-                    <input type="checkbox" name="invert_fit" value="" id="inverse-fit-checkbox" />
-                    <label for="invert_fit">Smaller fit (shrink to fit)</label>
-                    <div style="padding-bottom: 5px;">Toggle "Smaller Fit" to reset the image's position and size</div>
-                </div>
-                <div id="hide-blurred-background-container">
-                    <input type="checkbox" name="hide-blurred-background" value="" id="hide-blurred-background-checkbox" />
-                    <label for="hide-blurred-background">Hide blurred background</label>
-                </div>
-            </div>
+            <h2>Current Slide</h2>
             <div>
                 <label for="slide_title">Title: </label>
                 <input type="text" name="slide_title" id="slide_title" value="" size="45" />
@@ -92,7 +78,19 @@
             </div>
         </div>
         <div>
-            <p>Drag and drop images to load them or <button id="image-load-btn">click here</button></p>
+            <h2>Image Selection and Slide Preview</h2>
+            <div>
+                <div>
+                    <input type="checkbox" name="invert_fit" value="" id="inverse-fit-checkbox" />
+                    <label for="invert_fit">Smaller fit (shrink to fit)</label>
+                    <div style="padding-bottom: 5px;">Toggle "Smaller Fit" to reset the image's position and size</div>
+                </div>
+                <div id="hide-blurred-background-container">
+                    <input type="checkbox" name="hide-blurred-background" value="" id="hide-blurred-background-checkbox" />
+                    <label for="hide-blurred-background">Hide blurred background</label>
+                </div>
+            </div>
+            <p>Drag and drop images (below) to load them or <button id="image-load-btn">click here</button></p>
             <div id="canvas-container">
                 <canvas src="" id="output-img" alt="" width="360px"
                     height="450px">
