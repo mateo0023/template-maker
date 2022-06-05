@@ -6,7 +6,7 @@ const canvas = new fabric.Canvas('output-img', {
     backgroundColor: 'white',
     uniformScaling: true,
 });
-const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.15, clipName: 'blur' });
+const smallBkBlur = new fabric.Image.filters.Blur({ blur: 0.2, clipName: 'blur' });
 
 canvas.SCALE = canvas.getHeight() / 1350;
 const CORNER_RADIUS = 43.2;
