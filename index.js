@@ -30,13 +30,6 @@ quill.on('text-change', () => {
     }
 })
 
-document.getElementById('save-progress').addEventListener('click', saveToBrowser)
-
-document.getElementById('export-btn').addEventListener('click', (e) => {
-    saveToBrowser()
-    exportToZip(mainData)
-})
-
 {
     const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
     if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
@@ -52,6 +45,14 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
         document.getElementById("policyNotice").style.display = "none";
     })
 }
+
+document.getElementById('save-progress').addEventListener('click', saveToBrowser)
+
+document.getElementById('export-btn').addEventListener('click', (e) => {
+    saveToBrowser()
+    exportToZip(mainData)
+})
+
 // Title input
 document.getElementById('slide_title').addEventListener('input', (e) => {
     currentSlide.title = e.target.value;
@@ -69,12 +70,18 @@ if (AUTO_SAVE) {
     })
 }
 
+// Listen to beggining of draging something over the canvas container
 document.getElementById('canvas-container').addEventListener("dragover", draggoverHandler)
 
+// Something dropped over the canvas container
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
     dropHandler(e, currentSlide).then(slide => {
         updateImagePreview(slide)
     })
+})
+
+document.getElementById('image-load-btn').addEventListener('click', e => {
+    askForImageAndAddToslide(currentSlide).then( updateImagePreview )
 })
 
 // Invert Image Checkbox
@@ -142,7 +149,7 @@ function dropHandler(e, slide = currentSlide) {
             if (e.dataTransfer.files.length && e.dataTransfer.files[0]?.type?.startsWith('image/') && e.dataTransfer.files[0]?.type !== "image/bmp") {
                 const reader = new FileReader()
 
-                reader.addEventListener("load", function () {
+                reader.addEventListener("load", () => {
                     // convert image file to base64 string
                     slide.img.src = reader.result;
                     resolve(slide)
@@ -327,21 +334,31 @@ function moveSlideDown() {
     updateSlidesList(false)
 }
 
-function prevent_default(e) {
-    e.preventDefault()
-}
+// Returns a promise that will be resolved once the file has been updated (passing it the new slide)
+function askForImageAndAddToslide(slide) {
+    return new Promise((resolve, reject) => {
+        const file_loader = document.createElement('input')
+        file_loader.type = "file"
+        file_loader.accept = "image/*"
+        file_loader.addEventListener('input', (e) => {
+            try {
+                const reader = new FileReader()
+    
+                reader.addEventListener("load", () => {
+                    // convert image file to base64 string
+                    slide.img.src = reader.result;
+                    resolve(slide)
+                }, false);
+    
+                console.trace(file_loader.files)
+                reader.readAsDataURL(file_loader.files[0])
+            } catch (error) {
+                reject(error)
+            }
+        })
 
-function drop_handler(e, slide) {
-    e.preventDefault();
-
-    if (e.files.length > 0 && e.files[0].type.startsWith('image')) {
-        ((slide === undefined) ? currentSlide : slide).img.src = e.files[0].createObjectURL()
-    } else {
-        ((slide === undefined) ? currentSlide : slide).img.src = e.dataTransfer.getData("URL");
-    }
-    if (slide !== currentSlide) {
-        updateImagePreview(currentSlide)
-    }
+        file_loader.click()
+    })
 }
 
 function saveProgressToObj() {
