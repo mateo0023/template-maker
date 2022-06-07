@@ -366,9 +366,13 @@ function saveProgressToObj() {
 
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
-    currentSlide.img.top = getPosition()
-    currentSlide.img.width = getWidth()
-    // currentSlide.fabric = getCanvasObj()
+    if(currentSlide.img.reverse_fit){
+        currentSlide.img.top = getPosition()
+        currentSlide.img.width = getWidth()
+    } else {
+        currentSlide.img.top = null
+        currentSlide.img.width = null
+    }
 }
 
 function saveToBrowser() {

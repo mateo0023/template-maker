@@ -272,7 +272,7 @@ function getWidth(_canvas = canvas) {
     // If it's not defined or it's greater than the canvas-width, return null
     if (_canvas.bkImageFabricGroup === undefined
         ||
-        _canvas.bkImageFabricGroup.getScaledWidth() >= _canvas.getWidth()) {
+        Math.round(_canvas.bkImageFabricGroup.getScaledWidth()) === Math.round(_canvas.getWidth())) {
         return null;
     }
     return _canvas.bkImageFabricGroup.getScaledWidth() / _canvas.SCALE
