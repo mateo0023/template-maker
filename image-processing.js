@@ -40,7 +40,70 @@ canvas.title_bounding_box
 canvas.content_bounding_box;
 
 // This will update the image preview (no blur behind text)
-function updateImagePreview(slide_obj) { return createImage(canvas, slide_obj) }
+function updateImagePreview(slide_obj) {
+    if (canvas?.prev_obj === undefined) {
+        return createImage(canvas, slide_obj)
+    } else if (canvas?.prev_obj !== slide_obj) {
+        return new Promise((resolve, reject) => {
+            try {
+                // Update only when necessary
+                const updateCanvas = (_canvas, slide_obj) => {
+                    _canvas.clear()
+                    _canvas.setBackgroundColor('white')
+    
+                    if (_canvas.blBkImageFabric !== undefined &&
+                        (slide_obj.img.hide_blr_bk === undefined || slide_obj.img.hide_blr_bk === false) &&
+                        slide_obj.img.reverse_fit !== false) {
+                        _canvas.add(_canvas.blBkImageFabric)
+                    }
+    
+                    if (_canvas.bkImageFabricGroup !== undefined) {
+                        _canvas.add(_canvas.bkImageFabricGroup)
+                    }
+                    addTextToCanvas(_canvas, slide_obj)
+    
+                    if (_canvas.logo) {
+                        _canvas.add(_canvas.logo)
+                        resolve(_canvas)
+                    } else {
+                        addNewLogoToCanvas(_canvas, () => { resolve(_canvas) })
+                    }
+                };
+    
+                if (slide_obj.img.src === '') {
+                    canvas.bkImageFabricGroup = undefined
+                    canvas.blBkImageFabric = undefined
+                    updateCanvas()
+                } else if (canvas.prevObj?.img?.src !== slide_obj.img.src) {
+                    let async_counter = 2;
+    
+                    // Will need to update both images
+                    updateBkImageGroup(canvas, slide_obj, () => {
+                        async_counter--;
+                        if (async_counter == 0) {
+                            updateCanvas()
+                        }
+                    })
+    
+                    updateBlBkImageFabric(canvas, slide_obj, () => {
+                        async_counter--;
+                        if (async_counter == 0) {
+                            updateCanvas()
+                        }
+                    })
+                } else if (canvas.prevObj?.img?.reverse_fit !== slide_obj.img.reverse_fit) {
+                    canvas.bkImageFabricGroup.setOptions(...getGroupOptions(slide_obj))
+                    scaleForegroundImg(canvas, canvas.bkImageFabricGroup, slide_obj)
+                } else {
+                    updateCanvas()
+                }
+            } catch (error) {
+                reject(error)
+            }
+            canvas.prevObj = structuredClone(slide_obj)
+        })
+    }
+}
 
 function createImage(_canvas, slide_obj) {
     return new Promise((res, rej) => {
@@ -287,18 +350,7 @@ function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.
                 images.non_blurred, images.blurred
             ],
             {
-                ...((slide_obj.img.reverse_fit) ?
-                    {
-                        lockScalingFlip: true,
-                        lockRotation: true,
-                        lockMovementX: true,
-                        centeredScaling: true,
-                        lockSkewingX: true,
-                        lockSkewingY: true,
-                    }
-                    :
-                    { selectable: false }
-                ),
+                ...getGroupOptions(slide_obj),
                 objectCaching: false
             }
         )
@@ -341,28 +393,7 @@ function getBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(
             if (err) {
                 throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
             } else {
-                if (slide_obj.img?.reverse_fit === true &&
-                    slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
-                    img.scaleToWidth(slide_obj.img.width * _canvas.SCALE)
-                } else if (slide_obj.img?.reverse_fit) {
-                    if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
-                        img.scaleToWidth(_canvas.getWidth())
-                    } else {
-                        img.scaleToHeight(_canvas.getHeight())
-                    }
-                } else {
-                    if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
-                        img.scaleToHeight(_canvas.getHeight())
-                    } else {
-                        img.scaleToWidth(_canvas.getWidth())
-                    }
-                }
-
-                if (slide_obj.img.top !== null && slide_obj.img.reverse_fit) {
-                    img.set({ 'top': slide_obj.img.top * _canvas.SCALE, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
-                } else {
-                    img.set({ 'top': (IMAGE_HEIGHT * _canvas.SCALE - img.getScaledHeight()) / 2, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
-                }
+                scaleForegroundImg(_canvas, img, slide_obj)
 
                 _callback(img)
             }
@@ -382,6 +413,46 @@ function getBlurredBkImageFabric(_canvas, slide_obj, _callback = (img) => { canv
 
         _callback(img)
     })
+}
+
+function scaleForegroundImg(_canvas, img, slide_obj) {
+    if (slide_obj.img?.reverse_fit === true &&
+        slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
+        img.scaleToWidth(slide_obj.img.width * _canvas.SCALE)
+    } else if (slide_obj.img?.reverse_fit) {
+        if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
+            img.scaleToWidth(_canvas.getWidth())
+        } else {
+            img.scaleToHeight(_canvas.getHeight())
+        }
+    } else {
+        if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
+            img.scaleToHeight(_canvas.getHeight())
+        } else {
+            img.scaleToWidth(_canvas.getWidth())
+        }
+    }
+
+    if (slide_obj.img.top !== null && slide_obj.img.reverse_fit) {
+        img.set({ 'top': slide_obj.img.top * _canvas.SCALE, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
+    } else {
+        img.set({ 'top': (IMAGE_HEIGHT * _canvas.SCALE - img.getScaledHeight()) / 2, 'left': (_canvas.getWidth() - img.getScaledWidth()) / 2 });
+    }
+}
+
+function getGroupOptions(slide_obj) {
+    if (slide_obj.img.reverse_fit) {
+        return {
+            lockScalingFlip: true,
+            lockRotation: true,
+            lockMovementX: true,
+            centeredScaling: true,
+            lockSkewingX: true,
+            lockSkewingY: true,
+        }
+    } else {
+        return { selectable: false }
+    }
 }
 
 // Will update the _canvas.blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
@@ -415,7 +486,7 @@ function updateBlBkImageFabric(_canvas, slide_obj, _callback = img => { canvas.a
 }
 
 // Makes the rounded-corner blue rectangle
-function fabricMakeRect(_canvas, x, y, width, height, _fill_color=`rgba(44, 109, 195, 0.62)`) {
+function fabricMakeRect(_canvas, x, y, width, height, _fill_color = `rgba(44, 109, 195, 0.62)`) {
     return new fabric.Rect({
         left: x,
         top: y,
