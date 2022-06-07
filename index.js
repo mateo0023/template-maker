@@ -355,7 +355,6 @@ function askForImageAndAddToslide(slide) {
                     resolve(slide)
                 }, false);
     
-                console.trace(file_loader.files)
                 reader.readAsDataURL(file_loader.files[0])
             } catch (error) {
                 reject(error)
@@ -368,8 +367,6 @@ function askForImageAndAddToslide(slide) {
 
 function saveProgressToObj() {
     // The slide content is handled by quill
-    console.trace(`Reverse fit: ${currentSlide.img.reverse_fit}`)
-    console.log(currentSlide.img)
 
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
@@ -380,7 +377,6 @@ function saveProgressToObj() {
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
-    console.log(currentSlide.img)
 }
 
 function saveToBrowser(update_current = true) {
