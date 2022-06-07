@@ -231,11 +231,11 @@ function addTextToCanvas(_canvas = canvas, slide_obj) {
                 // Title Box
                 ...((_canvas.title_txt_box === null) ? [] : [fabricMakeRect(_canvas,
                     MARGIN * _canvas.SCALE, MARGIN * _canvas.SCALE,
-                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.title_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)]),
+                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.title_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE, "#fff")]),
                 // Content Box
                 ...((_canvas.content_txt_box === null) ? [] : [fabricMakeRect(_canvas,
                     MARGIN * _canvas.SCALE, _canvas.content_txt_box.top - TXT_PADDING * _canvas.SCALE,
-                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.content_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE)])
+                    MAX_RECT_WIDTH * _canvas.SCALE, _canvas.content_txt_box.calcTextHeight() + TXT_PADDING * 2 * _canvas.SCALE, "#fff")])
             ],
             {
                 absolutePositioned: true
@@ -415,13 +415,13 @@ function updateBlBkImageFabric(_canvas, slide_obj, _callback = img => { canvas.a
 }
 
 // Makes the rounded-corner blue rectangle
-function fabricMakeRect(_canvas, x, y, width, height) {
+function fabricMakeRect(_canvas, x, y, width, height, _fill_color=`rgba(44, 109, 195, 0.62)`) {
     return new fabric.Rect({
         left: x,
         top: y,
         width: width,
         height: height,
-        fill: `rgba(44, 109, 195, 0.62)`,
+        fill: _fill_color,
         rx: CORNER_RADIUS * _canvas.SCALE,
         ry: CORNER_RADIUS * _canvas.SCALE,
         selectable: false,
