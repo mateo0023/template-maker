@@ -275,7 +275,7 @@ function updateSlide() {
 
 function addArticle(title) {
     currentSlide = createSlideObj();
-    currentSlide.title = title;
+    currentSlide.title = (title === undefined) ? '' : title;
     currentArticle = { slides: [currentSlide] }
 
     mainData.articles.push(currentArticle)
