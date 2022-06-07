@@ -88,6 +88,10 @@ document.getElementById('image-load-btn').addEventListener('click', e => {
 document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) => {
     currentSlide.img.reverse_fit = e.target.checked
     document.querySelector('#hide-blurred-background-container').hidden = !e.target.checked
+    if(!e.target.checked){
+        currentSlide.img.top = null
+        currentSlide.img.width = null
+    }
     makeBaseAndUpdate()
     if (AUTO_SAVE) {
         saveToBrowser();
