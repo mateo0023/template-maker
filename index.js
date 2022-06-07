@@ -49,7 +49,7 @@ quill.on('text-change', () => {
 document.getElementById('save-progress').addEventListener('click', saveToBrowser)
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
-    saveToBrowser()
+    saveToBrowser(true)
     exportToZip(mainData)
 })
 
@@ -66,7 +66,7 @@ document.getElementById('slide_title').addEventListener('input', (e) => {
 // Title de-focused
 if (AUTO_SAVE) {
     document.getElementById('slide_title').addEventListener('blur', (e) => {
-        saveToBrowser();
+        saveToBrowser(true);
     })
 }
 
@@ -88,13 +88,14 @@ document.getElementById('image-load-btn').addEventListener('click', e => {
 document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) => {
     currentSlide.img.reverse_fit = e.target.checked
     document.querySelector('#hide-blurred-background-container').hidden = !e.target.checked
+    // To ensure it is properly re-set
     if(!e.target.checked){
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
-    makeBaseAndUpdate()
+    updateImagePreview(currentSlide)
     if (AUTO_SAVE) {
-        saveToBrowser();
+        saveToBrowser(false);
     }
 })
 
@@ -103,7 +104,7 @@ document.getElementById('hide-blurred-background-checkbox').addEventListener('ch
     currentSlide.img.hide_blr_bk = e.target.checked
     makeBaseAndUpdate()
     if (AUTO_SAVE) {
-        saveToBrowser();
+        saveToBrowser(false);
     }
 })
 
@@ -298,7 +299,7 @@ function makeNewSlide() {
 
     updateSlidesList(false);
     if (AUTO_SAVE) {
-        saveToBrowser();
+        saveToBrowser(false);
     }
 }
 
@@ -367,6 +368,8 @@ function askForImageAndAddToslide(slide) {
 
 function saveProgressToObj() {
     // The slide content is handled by quill
+    console.trace(`Reverse fit: ${currentSlide.img.reverse_fit}`)
+    console.log(currentSlide.img)
 
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
@@ -377,10 +380,12 @@ function saveProgressToObj() {
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
+    console.log(currentSlide.img)
 }
 
-function saveToBrowser() {
-    saveProgressToObj()
+function saveToBrowser(update_current = true) {
+    if(update_current)
+        saveProgressToObj()
     window.localStorage.setItem('data', JSON.stringify(mainData))
 }
 

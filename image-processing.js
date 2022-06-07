@@ -419,7 +419,7 @@ function scaleForegroundImg(_canvas, img, slide_obj) {
     if (slide_obj.img?.reverse_fit === true &&
         slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
         img.scaleToWidth(slide_obj.img.width * _canvas.SCALE)
-    } else if (slide_obj.img?.reverse_fit) {
+    } else if (slide_obj.img?.reverse_fit === true) {
         if (img.getScaledWidth() / img.getScaledHeight() > 4.0 / 5) {
             img.scaleToWidth(_canvas.getWidth())
         } else {
