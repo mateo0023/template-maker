@@ -1,27 +1,5 @@
-@font-face {
-    font-family: Celebes;
-    src: url("./fonts/Celebes-Regular.ttf");
-}
-
-@font-face {
-    font-family: Celebes;
-    src: url("./fonts/Celebes-Bold.ttf");
-    font-style: normal;
-    font-weight: bold;
-}
-
-@font-face {
-    font-family: Celebes;
-    src: url("./fonts/Celebes-BoldItalic.ttf");
-    font-style: italic;
-    font-weight: bold;
-}
-
-@font-face {
-    font-family: Celebes;
-    src: url("./fonts/Celebes-Italic.ttf");
-    font-style: italic;
-    font-weight: normal;
+body {
+    font-family: 'Celebes';
 }
 
 .selected {
@@ -38,7 +16,7 @@
 
 #slide_content {
     font-size: 17px;
-    font-family: Celebes;
+    font-family: "Celebes";
     width: 100%;
     height: 325px;
 }
@@ -65,7 +43,7 @@
 
 .global-container>* {
     flex-basis: 500px;
-    flex: 1 0;
+    /* flex: 1 0; */
     margin: 0 auto 0 auto;
 }
 
@@ -76,4 +54,16 @@
 
 #sample-output-img {
     padding: 10px;
+}
+
+#output-img {
+    border: solid;
+}
+
+#policyNotice {
+    display: inline;
+    border: 2px solid #ccc !important;
+    border-radius: 16px;
+    padding: 16px;
+    background-color: aqua;
 }
