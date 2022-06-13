@@ -46,10 +46,13 @@ quill.on('text-change', () => {
     })
 }
 
-document.getElementById('save-progress').addEventListener('click', saveToBrowser)
+document.getElementById('save-progress').addEventListener('click', () => {
+    showLoading()
+    saveToBrowser()
+    hideLoading()
+})
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
-    document.getElementById('loading-container').style.display = 'block'
     saveToBrowser(true)
     exportToZip(mainData).finally(() => {
         document.getElementById('loading-container').style.display = 'none'
@@ -78,13 +81,13 @@ document.getElementById('canvas-container').addEventListener("dragover", draggov
 
 // Something dropped over the canvas container
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
-    document.getElementById('loading-container').style.display = 'block'
+    showLoading()
     dropHandler(e, currentSlide).then(slide => {
         updateImagePreview(slide).finally(() => {
-            document.getElementById('loading-container').style.display = 'none'
+            hideLoading()
         })
     }).catch(() => {
-        document.getElementById('loading-container').style.display = 'none'
+        hideLoading()
     })
 })
 
@@ -391,6 +394,14 @@ function saveToBrowser(update_current = true) {
     if (update_current)
         saveProgressToObj()
     window.localStorage.setItem('data', JSON.stringify(mainData))
+}
+
+function showLoading(){
+    document.getElementById('loading-container').style.display = 'block'
+}
+
+function hideLoading() {
+    document.getElementById('loading-container').style.display = 'none'
 }
 
 function createCollectionObj() {
