@@ -531,7 +531,7 @@ function processContent(_canvas, content_obj) {
 
     let prev_bullet_idx = 0;
     let working_idx = 0;
-    for (let i = 0; i < content_obj.ops.length; i++) {
+    for (let i = 0; i < content_obj?.ops?.length; i++) {
         let temp_txt;
         let new_bullet_idx = checkIfIsBullet(content_obj.ops, i)
 
