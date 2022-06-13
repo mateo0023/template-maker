@@ -49,8 +49,11 @@ quill.on('text-change', () => {
 document.getElementById('save-progress').addEventListener('click', saveToBrowser)
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
+    document.getElementById('loading-container').style.display = 'block'
     saveToBrowser(true)
-    exportToZip(mainData)
+    exportToZip(mainData).finally(() => {
+        document.getElementById('loading-container').style.display = 'none'
+    })
 })
 
 // Title input
@@ -75,13 +78,15 @@ document.getElementById('canvas-container').addEventListener("dragover", draggov
 
 // Something dropped over the canvas container
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
+    document.getElementById('loading-container').style.display = 'block'
     dropHandler(e, currentSlide).then(slide => {
+        document.getElementById('loading-container').style.display = 'none'
         updateImagePreview(slide)
     })
 })
 
 document.getElementById('image-load-btn').addEventListener('click', e => {
-    askForImageAndAddToslide(currentSlide).then( updateImagePreview )
+    askForImageAndAddToslide(currentSlide).then(updateImagePreview)
 })
 
 // Invert Image Checkbox
@@ -89,7 +94,7 @@ document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) =
     currentSlide.img.reverse_fit = e.target.checked
     document.querySelector('#hide-blurred-background-container').hidden = !e.target.checked
     // To ensure it is properly re-set
-    if(!e.target.checked){
+    if (!e.target.checked) {
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
@@ -348,13 +353,13 @@ function askForImageAndAddToslide(slide) {
         file_loader.addEventListener('input', (e) => {
             try {
                 const reader = new FileReader()
-    
+
                 reader.addEventListener("load", () => {
                     // convert image file to base64 string
                     slide.img.src = reader.result;
                     resolve(slide)
                 }, false);
-    
+
                 reader.readAsDataURL(file_loader.files[0])
             } catch (error) {
                 reject(error)
@@ -370,7 +375,7 @@ function saveProgressToObj() {
 
     currentSlide.title = slide_title.value
     currentSlide.content = quill.getContents()
-    if(currentSlide.img.reverse_fit){
+    if (currentSlide.img.reverse_fit) {
         currentSlide.img.top = getPosition()
         currentSlide.img.width = getWidth()
     } else {
@@ -380,7 +385,7 @@ function saveProgressToObj() {
 }
 
 function saveToBrowser(update_current = true) {
-    if(update_current)
+    if (update_current)
         saveProgressToObj()
     window.localStorage.setItem('data', JSON.stringify(mainData))
 }

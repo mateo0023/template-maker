@@ -14,7 +14,7 @@
     <link rel="prefetch" as="font" href="/fonts/Celebes-Bold.woff2" type="font/woff2" crossorigin="anonymous">
     <link rel="prefetch" as="font" href="/fonts/Celebes-Italic.woff2" type="font/woff2" crossorigin="anonymous">
     <link rel="preload" as="font" href="/fonts/Celebes-BoldItalic.woff2" type="font/woff2" crossorigin="anonymous">
-    <link rel="stylesheet" href="./fonts.css" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="./fonts.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="./main.css" />
 
     <script type="module" src="./lib/quill/quill.min.js"></script>
@@ -86,35 +86,35 @@
                     <div style="padding-bottom: 5px;">Toggle "Smaller Fit" to reset the image's position and size</div>
                 </div>
                 <div id="hide-blurred-background-container">
-                    <input type="checkbox" name="hide-blurred-background" value="" id="hide-blurred-background-checkbox" />
+                    <input type="checkbox" name="hide-blurred-background" value=""
+                        id="hide-blurred-background-checkbox" />
                     <label for="hide-blurred-background">Hide blurred background</label>
                 </div>
             </div>
             <p>Drag and drop images (below) to load them or <button id="image-load-btn">click here</button></p>
             <div id="canvas-container">
-                <canvas src="" id="output-img" alt="" width="360px"
-                    height="450px">
+                <canvas src="" id="output-img" alt="" width="360px" height="450px">
                 </canvas>
             </div>
         </div>
     </div>
 
-    <div>
-        <div id="policyNotice" class="light display-right" style="display: none;">
-            <div id="closeIcon" style="display: none;">
-            </div>
-            <div class="title-wrap">
-                <h4>Usage Policy Consent</h4>
-            </div>
-            <div class="content-wrap">
-                <div class="msg-wrap">
-                    <p>Images produced by this website are property of SolveIt News Inc.</p>
-                    <div class="btn-wrap">
-                        <button id="acknowledge-btn">Accept</button>
-                    </div>
+    <div id="policyNotice" class="overlay">
+        <div class="title-wrap">
+            <h4>Usage Policy Consent</h4>
+        </div>
+        <div class="content-wrap">
+            <div class="msg-wrap">
+                <p>Images produced by this website are property of SolveIt News Inc.</p>
+                <div class="btn-wrap">
+                    <button id="acknowledge-btn">Accept</button>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="loading-container" class="overlay">
+        <div class="loader"></div>
     </div>
 </body>
 

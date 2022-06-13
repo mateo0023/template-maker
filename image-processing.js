@@ -50,47 +50,37 @@ function updateImagePreview(slide_obj) {
                 const updateCanvas = (_canvas, slide_obj) => {
                     _canvas.clear()
                     _canvas.setBackgroundColor('white')
-    
+
                     if (_canvas.blBkImageFabric !== undefined &&
                         (slide_obj.img.hide_blr_bk === undefined || slide_obj.img.hide_blr_bk === false) &&
                         slide_obj.img.reverse_fit !== false) {
                         _canvas.add(_canvas.blBkImageFabric)
                     }
-    
+
                     if (_canvas.bkImageFabricGroup !== undefined) {
                         _canvas.add(_canvas.bkImageFabricGroup)
                     }
                     addTextToCanvas(_canvas, slide_obj)
-    
+
                     if (_canvas.logo) {
                         _canvas.add(_canvas.logo)
                         resolve(_canvas)
                     } else {
-                        addNewLogoToCanvas(_canvas, () => { resolve(_canvas) })
+                        addNewLogoToCanvas(_canvas).then(() => { res(_canvas) })
                     }
                 };
-    
+
                 if (slide_obj.img.src === '') {
                     canvas.bkImageFabricGroup = undefined
                     canvas.blBkImageFabric = undefined
                     updateCanvas()
                 } else if (canvas.prevObj?.img?.src !== slide_obj.img.src) {
-                    let async_counter = 2;
-    
-                    // Will need to update both images
-                    updateBkImageGroup(canvas, slide_obj, () => {
-                        async_counter--;
-                        if (async_counter == 0) {
-                            updateCanvas()
-                        }
-                    })
-    
-                    updateBlBkImageFabric(canvas, slide_obj, () => {
-                        async_counter--;
-                        if (async_counter == 0) {
-                            updateCanvas()
-                        }
-                    })
+                    Promise.all([
+                        // Will need to update both images
+                        updateBkImageGroup(_canvas, slide_obj),
+                        updateBlBkImageFabric(_canvas, slide_obj)
+                    ]).then(updateCanvas).catch(err => { reject(err) })
+
                 } else if (canvas.prevObj?.img?.reverse_fit !== slide_obj.img.reverse_fit) {
                     canvas.bkImageFabricGroup.setOptions(...getGroupOptions(slide_obj))
                     scaleForegroundImg(canvas, canvas.bkImageFabricGroup, slide_obj)
@@ -128,7 +118,7 @@ function createImage(_canvas, slide_obj) {
                     _canvas.add(_canvas.logo)
                     res(_canvas)
                 } else {
-                    addNewLogoToCanvas(_canvas, () => { res(_canvas) })
+                    addNewLogoToCanvas(_canvas).then(() => { res(_canvas) })
                 }
             };
 
@@ -137,22 +127,11 @@ function createImage(_canvas, slide_obj) {
                 _canvas.blBkImageFabric = undefined
                 updateCanvas()
             } else {
-                let async_counter = 2;
-
-                // Will need to update both images
-                updateBkImageGroup(_canvas, slide_obj, () => {
-                    async_counter--;
-                    if (async_counter == 0) {
-                        updateCanvas()
-                    }
-                })
-
-                updateBlBkImageFabric(_canvas, slide_obj, () => {
-                    async_counter--;
-                    if (async_counter == 0) {
-                        updateCanvas()
-                    }
-                })
+                Promise.all([
+                    // Will need to update both images
+                    updateBkImageGroup(_canvas, slide_obj),
+                    updateBlBkImageFabric(_canvas, slide_obj)
+                ]).then(updateCanvas).catch(err => { reject(err) })
             }
         } catch (error) {
             rej(error)
@@ -161,47 +140,48 @@ function createImage(_canvas, slide_obj) {
 
 }
 
-function exportSlideToFile(slide_obj, _callback = () => { }) {
+function exportSlideToFile(slide_obj) {
     const _canvas = createGhostCanvas()
-    createImage(_canvas, slide_obj).then(result => {
-        _callback(_canvas.toDataURL({
+    return createImage(_canvas, slide_obj).then(result => {
+        return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
-        }))
+        })
     })
-
 }
 
 function exportToZip(collection) {
-    var zip = new JSZip()
+    return new Promise((resolve, reject) => {
+        var zip = new JSZip()
 
-    zip.file('collection.json', JSON.stringify(collection))
+        zip.file('collection.json', JSON.stringify(collection))
 
-    // Want to keep track of the callbacks.
-    // Since we add the ammount of articles (and remove them as we update it)
-    // it should only reach 0 once all slides have been computed (instead of at every single article)
-    let total_counter = collection.articles.length
-    for (const art of collection.articles) {
-        total_counter += art.slides.length - 1
+        const file_promises = new Array()
+        // let total_counter = collection.articles.length
+        for (const art of collection.articles) {
+            // total_counter += art.slides.length - 1
 
-        const title = art.slides[0].title
-        for (let i = 0; i < art.slides.length; i++) {
-            exportSlideToFile(art.slides[i], uri => {
-                // This should be a constant value
-                var idx = uri.indexOf('base64,') + 'base64,'.length;
-                var content = uri.substring(idx);
-                zip.file(`${title}/${i}.jpeg`, content, { base64: true, createFolders: true })
+            const title = art.slides[0].title
+            for (let i = 0; i < art.slides.length; i++) {
+                file_promises.push(exportSlideToFile(art.slides[i]).then(uri => {
+                    // This should be a constant value
+                    var idx = uri.indexOf('base64,') + 'base64,'.length;
+                    var content = uri.substring(idx);
+                    zip.file(`${title}/${i}.jpeg`, content, { base64: true, createFolders: true })
 
-                total_counter--;
-                if (total_counter <= 0) {
-                    zip.generateAsync({ type: "blob" })
-                        .then((blob) => {
-                            saveAs(blob, "collection.zip");
-                        });
-                }
-            })
+                    return uri
+                }))
+            }
         }
-    }
+
+        Promise.allSettled(file_promises).then(file_uris => {
+            zip.generateAsync({ type: "blob" })
+                .then((blob) => {
+                    resolve("Ready to save")
+                    saveAs(blob, "collection.zip");
+                }).catch(reject)
+        })
+    })
 }
 
 
@@ -238,20 +218,22 @@ function createGhostCanvas() {
     return _canvas;
 }
 
-function addNewLogoToCanvas(_canvas, _callback) {
-    fabric.Image.fromURL(
-        './SolveIt Logo.png',
-        img => {
-            img.scaleToHeight(31 * _canvas.SCALE)
-            _canvas.logo = img
+function addNewLogoToCanvas(_canvas) {
+    return new Promise((resolve, reject) => {
+        fabric.Image.fromURL(
+            './SolveIt Logo.png',
+            img => {
+                img.scaleToHeight(31 * _canvas.SCALE)
+                _canvas.logo = img
 
-            _canvas.add(img)
+                _canvas.add(img)
 
-            _callback(img)
-        }, {
-        selectable: false,
-        top: _canvas.getHeight() - 31 * 1.5 * _canvas.SCALE,
-        left: _canvas.getWidth() - 31 * 1.5 * _canvas.SCALE,
+                resolve(img)
+            }, {
+            selectable: false,
+            top: _canvas.getHeight() - 31 * 1.5 * _canvas.SCALE,
+            left: _canvas.getWidth() - 31 * 1.5 * _canvas.SCALE,
+        })
     })
 }
 
@@ -341,80 +323,62 @@ function getWidth(_canvas = canvas) {
     return _canvas.bkImageFabricGroup.getScaledWidth() / _canvas.SCALE
 }
 
-function updateBkImageGroup(_canvas, slide_obj, _callback = (group) => { canvas.add(group) }) {
-    const images = {}
+function updateBkImageGroup(_canvas, slide_obj) {
+    return new Promise((resolve, reject) => {
+        Promise.all([getBkImageFabric(_canvas, slide_obj), getBlurredBkImageFabric(_canvas, slide_obj)]).then(images => {
+            _canvas.bkImageFabricGroup = new fabric.Group(
+                images,
+                {
+                    ...getGroupOptions(slide_obj),
+                    objectCaching: false
+                }
+            )
 
-    const lastPart = () => {
-        _canvas.bkImageFabricGroup = new fabric.Group(
-            [
-                images.non_blurred, images.blurred
-            ],
+            _canvas.bkImageFabricGroup.setControlsVisibility({
+                mb: false,
+                ml: false,
+                mr: false,
+                mt: false,
+                mtr: false,
+            })
+
+            resolve(_canvas.bkImageFabricGroup)
+        }).catch(reject)
+    })
+}
+
+// Will resolve with a new, properly scaled image
+function getBkImageFabric(_canvas, slide_obj) {
+    return new Promise((resolve, reject) => {
+        fabric.Image.fromURL(
+            slide_obj.img.src,
+            (img, err) => {
+                if (err) {
+                    reject(`There was an error loading the image ${slide_obj.img?.src}`)
+                } else {
+                    scaleForegroundImg(_canvas, img, slide_obj)
+
+                    resolve(img)
+                }
+            },
             {
-                ...getGroupOptions(slide_obj),
-                objectCaching: false
+                crossOrigin: 'anonymous'
             }
         )
-
-        _canvas.bkImageFabricGroup.setControlsVisibility({
-            mb: false,
-            ml: false,
-            mr: false,
-            mt: false,
-            mtr: false,
-        })
-
-        _callback(_canvas.bkImageFabricGroup)
-    }
-
-    let async_counter = 2;
-
-    getBkImageFabric(_canvas, slide_obj, (img) => {
-        images.non_blurred = img
-        async_counter--;
-        if (async_counter == 0) {
-            lastPart()
-        }
-    })
-
-    getBlurredBkImageFabric(_canvas, slide_obj, (img) => {
-        images.blurred = img
-        async_counter--;
-        if (async_counter == 0) {
-            lastPart()
-        }
     })
 }
 
-// Will create an image, scale it properly and pass it to the callback
-function getBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(img) }) {
-    fabric.Image.fromURL(
-        slide_obj.img.src,
-        (img, err) => {
-            if (err) {
-                throw Error(`There was an error loading the image ${slide_obj.img?.src}`)
-            } else {
-                scaleForegroundImg(_canvas, img, slide_obj)
-
-                _callback(img)
-            }
-        },
-        {
-            crossOrigin: 'anonymous'
-        }
-    )
-
-}
-
-// Will pass a slighly blurred image to the callback function
-function getBlurredBkImageFabric(_canvas, slide_obj, _callback = (img) => { canvas.add(img) }) {
-    getBkImageFabric(_canvas, slide_obj, (img) => {
+// Will resolve with a slighly blurred image
+function getBlurredBkImageFabric(_canvas, slide_obj) {
+    return getBkImageFabric(_canvas, slide_obj).then((img) => {
         img.filters.push(smallBkBlur)
         img.applyFilters()
 
-        _callback(img)
+        return img
     })
 }
 
+// Scales the img to fit the _canvas in accordance with slide_obj's properties
 function scaleForegroundImg(_canvas, img, slide_obj) {
     if (slide_obj.img?.reverse_fit === true &&
         slide_obj.img?.width !== null && slide_obj.img?.width !== undefined) {
@@ -440,6 +404,7 @@ function scaleForegroundImg(_canvas, img, slide_obj) {
     }
 }
 
+// Returns the appropiat image-group options in accordance with the current slide_obj properties
 function getGroupOptions(slide_obj) {
     if (slide_obj.img.reverse_fit) {
         return {
@@ -455,34 +420,40 @@ function getGroupOptions(slide_obj) {
     }
 }
 
-// Will update the _canvas.blBkImageFabric (THE CALLBACK ADDS TO CANVAS)
-function updateBlBkImageFabric(_canvas, slide_obj, _callback = img => { canvas.add(img) }) {
-    const html_img = document.createElement('img')
-    html_img.crossOrigin = "Anonymous"
-    html_img.addEventListener('load',
-        (img, err) => {
-            if (_canvas.blBkImageFabric !== undefined) {
-                _canvas.remove(_canvas.blBkImageFabric)
+// Will update the _canvas.blBkImageFabric and resolve with _canvas.blBkImageFabric
+function updateBlBkImageFabric(_canvas, slide_obj) {
+    return new Promise((resolve, reject) => {
+        fabric.Image.fromURL(
+            slide_obj.img.src,
+            (img, err) => {
+                if (err) {
+                    reject(err)
+                }
+                if (_canvas.blBkImageFabric !== undefined) {
+                    _canvas.remove(_canvas.blBkImageFabric)
+                }
+                _canvas.blBkImageFabric = img
+
+                if (_canvas.blBkImageFabric.getScaledWidth() / _canvas.blBkImageFabric.getScaledHeight() > 4.0 / 5) {
+                    _canvas.blBkImageFabric.scaleToHeight(_canvas.getHeight())
+                } else {
+                    _canvas.blBkImageFabric.scaleToWidth(_canvas.getWidth())
+                }
+                _canvas.blBkImageFabric.set({
+                    'top': (IMAGE_HEIGHT * _canvas.SCALE - _canvas.blBkImageFabric.getScaledHeight()) / 2,
+                    'left': (IMAGE_WIDTH * _canvas.SCALE - _canvas.blBkImageFabric.getScaledWidth()) / 2,
+                });
+
+                _canvas.blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
+                _canvas.blBkImageFabric.applyFilters()
+
+                resolve(_canvas.blBkImageFabric)
+            },
+            {
+                crossOrigin: 'anonymous'
             }
-            _canvas.blBkImageFabric = new fabric.Image(html_img, { selectable: false })
-
-            if (_canvas.blBkImageFabric.getScaledWidth() / _canvas.blBkImageFabric.getScaledHeight() > 4.0 / 5) {
-                _canvas.blBkImageFabric.scaleToHeight(_canvas.getHeight())
-            } else {
-                _canvas.blBkImageFabric.scaleToWidth(_canvas.getWidth())
-            }
-            _canvas.blBkImageFabric.set({
-                'top': (IMAGE_HEIGHT * _canvas.SCALE - _canvas.blBkImageFabric.getScaledHeight()) / 2,
-                'left': (IMAGE_WIDTH * _canvas.SCALE - _canvas.blBkImageFabric.getScaledWidth()) / 2,
-            });
-
-            _canvas.blBkImageFabric.filters.push(new fabric.Image.filters.Blur({ blur: 0.277777777777777 }))
-            _canvas.blBkImageFabric.applyFilters()
-
-            _callback(_canvas.blBkImageFabric)
-        },
-        false)
-    html_img.src = slide_obj.img.src
+        )
+    })
 }
 
 // Makes the rounded-corner blue rectangle
