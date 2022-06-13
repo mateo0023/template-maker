@@ -80,8 +80,11 @@ document.getElementById('canvas-container').addEventListener("dragover", draggov
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
     document.getElementById('loading-container').style.display = 'block'
     dropHandler(e, currentSlide).then(slide => {
+        updateImagePreview(slide).finally(() => {
+            document.getElementById('loading-container').style.display = 'none'
+        })
+    }).catch(() => {
         document.getElementById('loading-container').style.display = 'none'
-        updateImagePreview(slide)
     })
 })
 
