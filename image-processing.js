@@ -96,7 +96,7 @@ function updateImagePreview(slide_obj) {
 }
 
 function createImage(_canvas, slide_obj) {
-    return new Promise((res, rej) => {
+    return new Promise((resolve, reject) => {
         try {
             // This will be done last, it is where the promise will be resolved
             const updateCanvas = () => {
@@ -116,9 +116,9 @@ function createImage(_canvas, slide_obj) {
 
                 if (_canvas.logo) {
                     _canvas.add(_canvas.logo)
-                    res(_canvas)
+                    resolve(_canvas)
                 } else {
-                    addNewLogoToCanvas(_canvas).then(() => { res(_canvas) })
+                    addNewLogoToCanvas(_canvas).then(() => { resolve(_canvas) })
                 }
             };
 
@@ -134,7 +134,7 @@ function createImage(_canvas, slide_obj) {
                 ]).then(updateCanvas).catch(err => { reject(err) })
             }
         } catch (error) {
-            rej(error)
+            reject(error)
         }
     })
 
