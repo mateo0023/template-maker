@@ -9,7 +9,11 @@ var curr_slide_list_item;
 
 var quill = new Quill('#slide_content', {
     modules: {
-        toolbar: "#toolbar"
+        toolbar: "#toolbar",
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
     },
     placeholder: 'Enter the contents of the slide',
     theme: 'snow',
@@ -303,6 +307,7 @@ function updateSlide() {
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
     slide_title.value = currentSlide.title;
+    quill.history.clear();
     quill.setContents(currentSlide.content);
     updateImagePreview(currentSlide)
 }
