@@ -153,7 +153,9 @@ document.getElementById("rmv_btn").addEventListener('click', () => {
 
 // Add Slide Button
 document.getElementById("nxt_btn").addEventListener('click', () => {
-    makeNewSlide()
+    if(currentArticle.slides.length < 10){
+        makeNewSlide()
+    }
 })
 
 // Add Article Button
