@@ -12,7 +12,30 @@ var quill = new Quill('#slide_content', {
         toolbar: "#toolbar"
     },
     placeholder: 'Enter the contents of the slide',
-    theme: 'snow'
+    theme: 'snow',
+    formats: [
+        // 'background',
+        'bold',
+        // 'color',
+        // 'font',
+        // 'code',
+        'italic',
+        'link',
+        // 'size',
+        // 'strike',
+        'script',
+        // 'underline',
+        // 'blockquote',
+        // 'header',
+        // 'indent',
+        'list',
+        // 'align',
+        // 'direction',
+        // 'code-block',
+        // 'formula',
+        // 'image',
+        // 'video',
+    ]
 });
 
 const makeBaseAndUpdate = () => {
@@ -24,8 +47,8 @@ const makeBaseAndUpdate = () => {
 updateArticlesList()
 
 // When you change slide contents
-quill.on('text-change', () => {
-    if (currentSlide) {
+quill.on('text-change', (delta, oldContents, source) => {
+    if (currentSlide && source === "user") {
         makeBaseAndUpdate()
     }
 })
@@ -245,7 +268,7 @@ function updateSlidesList(update_current = true) {
         new_it.addEventListener('click', (e) => {
             saveProgressToObj();
 
-            clearSelected(list)
+            curr_slide_list_item.classList.remove('selected')
             e.target.classList.add('selected')
             currentSlide = slide
             curr_slide_list_item = e.target
