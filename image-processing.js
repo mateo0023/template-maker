@@ -143,6 +143,7 @@ function createImage(_canvas, slide_obj) {
 function exportSlideToFile(slide_obj) {
     const _canvas = createGhostCanvas()
     return createImage(_canvas, slide_obj).then(result => {
+        console.log(result)
         return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
@@ -164,6 +165,7 @@ function exportToZip(collection) {
             const title = art.slides[0].title
             for (let i = 0; i < art.slides.length; i++) {
                 file_promises.push(exportSlideToFile(art.slides[i]).then(uri => {
+                    console.log(uri)
                     // This should be a constant value
                     var idx = uri.indexOf('base64,') + 'base64,'.length;
                     var content = uri.substring(idx);
