@@ -450,6 +450,7 @@ function updateBlBkImageFabric(_canvas, slide_obj) {
                 resolve(_canvas.blBkImageFabric)
             },
             {
+                selectable: false,
                 crossOrigin: 'anonymous'
             }
         )
