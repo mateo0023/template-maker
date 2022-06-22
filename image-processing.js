@@ -1,5 +1,4 @@
 // Requires Fabric.js to be defined
-// import { saveAs } from './lib/FileSaver.min.js';
 
 const canvas = new fabric.Canvas('output-img', {
     preserveObjectStacking: true,
@@ -143,32 +142,12 @@ function createImage(_canvas, slide_obj) {
 function exportSlideToJpegData(slide_obj) {
     var _canvas = createGhostCanvas()
     return createImage(_canvas, slide_obj).then(result => {
+        console.log(result)
         return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
         }).substring(23);
     }).catch(err => { return err; })
-}
-
-function exportToZip(collection, progress_updater = ()=>{}) {
-    return new Promise((resolve, reject) => {
-        var zip = new JSZip()
-
-        zip.file('collection.json', JSON.stringify(collection))
-
-        for (const art of collection.articles) {
-            const title = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
-            for (let i = 0; i < art.slides.length; i++) {
-                zip.file(`${title}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
-            }
-        }
-
-        zip.generateAsync({ type: "blob" }, progress_updater)
-            .then((blob) => {
-                resolve("Ready to save")
-                saveAs(blob, "collection.zip");
-            }).catch(reject)
-    })
 }
 
 
@@ -603,5 +582,5 @@ export {
     updateImagePreview,
     getPosition,
     getWidth,
-    exportToZip
+    exportSlideToJpegData
 }

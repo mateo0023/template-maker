@@ -14,14 +14,13 @@ body {
     overflow-y: auto;
 }
 
-#slide_content {
+.my-qill {
     font-size: 17px;
     font-family: "Celebes";
     width: 100%;
-    height: 325px;
 }
 
-#slide_content .ql-editor {
+.my-qill .ql-editor {
     -ms-overflow-style: none;
     /* for Internet Explorer, Edge */
     scrollbar-width: none;
@@ -29,9 +28,13 @@ body {
     overflow-y: scroll;
 }
 
-#slide_content .ql-editor::-webkit-scrollbar {
+.my-qill .ql-editor::-webkit-scrollbar {
     display: none;
     /* for Chrome, Safari, and Opera */
+}
+
+#slide_content {
+    height: 325px;
 }
 
 .global-container {
@@ -94,6 +97,22 @@ body {
     100% {
         transform: rotate(360deg);
     }
+}
+
+.hidden {
+    display: none;
+}
+
+.selected-layout {
+    font-weight: bold;
+    color: black;
+    font-size: 1.25em;
+}
+
+.unselected-layout {
+    font-weight: 400;
+    color: #444;
+    font-style: italic;
 }
 
 #lists_container {
