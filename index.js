@@ -1,5 +1,4 @@
-import { updateImagePreview, getPosition, getWidth, exportToZip } from "./image-processing.js"
-const AUTO_SAVE = true;
+import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -7,7 +6,7 @@ var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
 
-var quill = new Quill('#slide_content', {
+const quillSlide = new Quill('#slide_content', {
     modules: {
         toolbar: "#toolbar",
         history: {
@@ -18,29 +17,66 @@ var quill = new Quill('#slide_content', {
     placeholder: 'Enter the contents of the slide',
     theme: 'snow',
     formats: [
-        // 'background',
         'bold',
-        // 'color',
-        // 'font',
-        // 'code',
         'italic',
         'link',
-        // 'size',
-        // 'strike',
         'script',
-        // 'underline',
-        // 'blockquote',
-        // 'header',
-        // 'indent',
         'list',
-        // 'align',
-        // 'direction',
-        // 'code-block',
-        // 'formula',
-        // 'image',
-        // 'video',
     ]
 });
+
+const quillDescription = new Quill('#article-description', {
+    modules: {
+        toolbar: "",
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
+    },
+    placeholder: 'Article\'s Instagram description',
+    theme: 'snow',
+    formats: []
+});
+
+const quillArticle = new Quill('#article-qill', {
+    modules: {
+        toolbar: [
+            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+            ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
+            ['blockquote', 'code-block'],
+
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'script': 'sub' }, { 'script': 'super' }],      // superscript/subscript
+
+            ['clean']                                         // remove formatting button
+        ],
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
+    },
+    placeholder: 'Write your full article here!',
+    theme: 'snow',
+    formats: [
+        'bold',
+        'color',
+        'code',
+        'italic',
+        'link',
+        'size',
+        'script',
+        'underline',
+        'blockquote',
+        'header',
+        'indent',
+        'list',
+        'code-block',
+        'formula',
+        'image',
+        'video',
+    ]
+});
+
 
 const makeBaseAndUpdate = () => {
     saveProgressToObj()
@@ -51,9 +87,23 @@ const makeBaseAndUpdate = () => {
 updateArticlesList()
 
 // When you change slide contents
-quill.on('text-change', (delta, oldContents, source) => {
+quillSlide.on('text-change', (delta, oldContents, source) => {
     if (currentSlide && source === "user") {
         makeBaseAndUpdate()
+    }
+})
+
+// When you change slide contents
+quillDescription.on('text-change', (delta, oldContents, source) => {
+    if (currentArticle && source === "user") {
+        currentArticle.desc = quillDescription.getText();
+    }
+})
+
+// When you change slide contents
+quillArticle.on('text-change', (delta, oldContents, source) => {
+    if (currentArticle && source === "user") {
+        currentArticle.article = quillArticle.getContents();
     }
 })
 
@@ -81,11 +131,53 @@ document.getElementById('save-progress').addEventListener('click', () => {
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
     saveToBrowser(true)
-    exportToZip(mainData, (progress_meta) => {
-        updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
-    }).finally(() => {
+    const exportPromise = new Promise((resolve, reject) => {
+        var zip = new JSZip()
+
+        zip.file('collection.json', JSON.stringify(mainData))
+
+        for (const art of mainData.articles) {
+            const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
+
+            if (art?.article !== undefined) {
+                quillArticle.setContents(art.article)
+                zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
+                zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
+            }
+
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+            for (let i = 0; i < art.slides.length; i++) {
+                zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
+            }
+        }
+
+        zip.generateAsync({ type: "blob" }, (progress_meta) => {
+            updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+        })
+            .then((blob) => {
+                resolve("Ready to save")
+                saveAs(blob, "collection.zip");
+            }).catch(reject)
+    })
+
+    exportPromise.finally(() => {
         document.getElementById('loading-container').style.display = 'none'
     })
+})
+
+
+document.getElementById('insta-article-selector').addEventListener('click', (e) => {
+    saveProgressToObj()
+    for (const el of document.getElementsByClassName('instagram')) {
+        el.classList.toggle('hidden')
+    }
+    for (const el of document.getElementsByClassName('non-instagram')) {
+        el.classList.toggle('hidden')
+    }
+    for (const el of document.querySelectorAll("#insta-article-selector > *")) {
+        el.classList.toggle('selected-layout')
+        el.classList.toggle('unselected-layout')
+    }
 })
 
 // Title input
@@ -99,11 +191,9 @@ document.getElementById('slide_title').addEventListener('input', (e) => {
 })
 
 // Title de-focused
-if (AUTO_SAVE) {
-    document.getElementById('slide_title').addEventListener('blur', (e) => {
-        saveToBrowser(true);
-    })
-}
+document.getElementById('slide_title').addEventListener('blur', (e) => {
+    saveToBrowser(true);
+})
 
 // Listen to beggining of draging something over the canvas container
 document.getElementById('canvas-container').addEventListener("dragover", draggoverHandler)
@@ -134,18 +224,14 @@ document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) =
         currentSlide.img.width = null
     }
     updateImagePreview(currentSlide)
-    if (AUTO_SAVE) {
-        saveToBrowser(false);
-    }
+    saveToBrowser(false);
 })
 
 // Hide Background Image Checkbox
 document.getElementById('hide-blurred-background-checkbox').addEventListener('change', (e) => {
     currentSlide.img.hide_blr_bk = e.target.checked
     makeBaseAndUpdate()
-    if (AUTO_SAVE) {
-        saveToBrowser(false);
-    }
+    saveToBrowser(false);
 })
 
 // Remove Slide Button
@@ -155,13 +241,13 @@ document.getElementById("rmv_btn").addEventListener('click', () => {
 
 // Add Slide Button
 document.getElementById("nxt_btn").addEventListener('click', () => {
-    if(currentArticle.slides.length < 10){
+    if (currentArticle.slides.length < 10) {
         makeNewSlide()
     }
 })
 
 // Add Article Button
-document.getElementById("add_art_btn").addEventListener('click', addArticle)
+document.getElementById("add_art_btn").addEventListener('click', () => { addArticle() })
 
 // Remove Article Button
 document.getElementById("remove_art").addEventListener('click', () => {
@@ -177,7 +263,6 @@ document.getElementById('move_slide_up').addEventListener('click', () => {
 document.getElementById('move_slide_down').addEventListener('click', () => {
     moveSlideDown()
 })
-
 
 function draggoverHandler(e) {
     e.stopPropagation()
@@ -243,12 +328,24 @@ function updateArticlesList(update_current = true) {
 
                 currentArticle = mainData.articles[i];
                 updateSlidesList();
+
+                quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
+                quillDescription.history.clear();
+    
+                quillArticle.setContents(currentArticle?.article)
+                quillArticle.history.clear();
             })
 
             if (mainData.articles[i] === currentArticle)
                 new_it.classList.add('selected')
             list.appendChild(new_it);
         }
+
+        quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
+        quillDescription.history.clear();
+    
+        quillArticle.setContents(currentArticle?.article)
+        quillArticle.history.clear();
 
         updateSlidesList(update_current);
     } else {
@@ -311,18 +408,20 @@ function updateSlide() {
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
     slide_title.value = currentSlide.title;
-    quill.history.clear();
-    quill.setContents(currentSlide.content);
+    quillSlide.setContents(currentSlide.content);
+    quillSlide.history.clear();
     updateImagePreview(currentSlide)
 }
 
 function addArticle(title) {
+    currentArticle.desc = quillDescription.getText()
+
     currentSlide = createSlideObj();
     currentSlide.title = (title === undefined) ? '' : title;
-    currentArticle = { slides: [currentSlide] }
+    currentArticle = createArticleObj()
+    currentArticle.slides[0] = currentSlide
 
     mainData.articles.push(currentArticle)
-
     updateArticlesList(false);
 }
 
@@ -409,10 +508,10 @@ function askForImageAndAddToslide(slide) {
 }
 
 function saveProgressToObj() {
-    // The slide content is handled by quill
+    // The description content is handled by quill
 
     currentSlide.title = slide_title.value
-    currentSlide.content = quill.getContents()
+    currentSlide.content = quillSlide.getContents()
     if (currentSlide.img.reverse_fit) {
         currentSlide.img.top = getPosition()
         currentSlide.img.width = getWidth()
@@ -428,7 +527,7 @@ function saveToBrowser(update_current = true) {
     window.localStorage.setItem('data', JSON.stringify(mainData))
 }
 
-function showLoading(){
+function showLoading() {
     document.getElementById('loading-container').style.display = 'block'
 }
 
@@ -443,9 +542,14 @@ function hideLoading() {
 
 function createCollectionObj() {
     return {
-        articles: [{
-            slides: [createSlideObj()]
-        }]
+        articles: [createArticleObj()]
+    }
+}
+
+function createArticleObj() {
+    return {
+        slides: [createSlideObj()],
+        desc: ""
     }
 }
 
