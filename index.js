@@ -9,10 +9,37 @@ var curr_slide_list_item;
 
 var quill = new Quill('#slide_content', {
     modules: {
-        toolbar: "#toolbar"
+        toolbar: "#toolbar",
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
     },
     placeholder: 'Enter the contents of the slide',
-    theme: 'snow'
+    theme: 'snow',
+    formats: [
+        // 'background',
+        'bold',
+        // 'color',
+        // 'font',
+        // 'code',
+        'italic',
+        'link',
+        // 'size',
+        // 'strike',
+        'script',
+        // 'underline',
+        // 'blockquote',
+        // 'header',
+        // 'indent',
+        'list',
+        // 'align',
+        // 'direction',
+        // 'code-block',
+        // 'formula',
+        // 'image',
+        // 'video',
+    ]
 });
 
 const makeBaseAndUpdate = () => {
@@ -24,8 +51,8 @@ const makeBaseAndUpdate = () => {
 updateArticlesList()
 
 // When you change slide contents
-quill.on('text-change', () => {
-    if (currentSlide) {
+quill.on('text-change', (delta, oldContents, source) => {
+    if (currentSlide && source === "user") {
         makeBaseAndUpdate()
     }
 })
@@ -54,7 +81,9 @@ document.getElementById('save-progress').addEventListener('click', () => {
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
     saveToBrowser(true)
-    exportToZip(mainData).finally(() => {
+    exportToZip(mainData, (progress_meta) => {
+        updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+    }).finally(() => {
         document.getElementById('loading-container').style.display = 'none'
     })
 })
@@ -126,7 +155,9 @@ document.getElementById("rmv_btn").addEventListener('click', () => {
 
 // Add Slide Button
 document.getElementById("nxt_btn").addEventListener('click', () => {
-    makeNewSlide()
+    if(currentArticle.slides.length < 10){
+        makeNewSlide()
+    }
 })
 
 // Add Article Button
@@ -245,7 +276,7 @@ function updateSlidesList(update_current = true) {
         new_it.addEventListener('click', (e) => {
             saveProgressToObj();
 
-            clearSelected(list)
+            curr_slide_list_item.classList.remove('selected')
             e.target.classList.add('selected')
             currentSlide = slide
             curr_slide_list_item = e.target
@@ -280,6 +311,7 @@ function updateSlide() {
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
     slide_title.value = currentSlide.title;
+    quill.history.clear();
     quill.setContents(currentSlide.content);
     updateImagePreview(currentSlide)
 }
@@ -400,8 +432,13 @@ function showLoading(){
     document.getElementById('loading-container').style.display = 'block'
 }
 
+function updateLoadingMessage(msg) {
+    document.querySelector("#loading-container > .loader-message").textContent = msg
+}
+
 function hideLoading() {
     document.getElementById('loading-container').style.display = 'none'
+    updateLoadingMessage("")
 }
 
 function createCollectionObj() {

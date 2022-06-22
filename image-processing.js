@@ -140,49 +140,35 @@ function createImage(_canvas, slide_obj) {
 
 }
 
-function exportSlideToFile(slide_obj) {
-    const _canvas = createGhostCanvas()
+function exportSlideToJpegData(slide_obj) {
+    var _canvas = createGhostCanvas()
     return createImage(_canvas, slide_obj).then(result => {
         console.log(result)
         return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
-        })
-    })
+        }).substring(23);
+    }).catch(err => { return err; })
 }
 
-function exportToZip(collection) {
+function exportToZip(collection, progress_updater = ()=>{}) {
     return new Promise((resolve, reject) => {
         var zip = new JSZip()
 
         zip.file('collection.json', JSON.stringify(collection))
 
-        const file_promises = new Array()
-        // let total_counter = collection.articles.length
         for (const art of collection.articles) {
-            // total_counter += art.slides.length - 1
-
-            const title = art.slides[0].title
+            const title = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
             for (let i = 0; i < art.slides.length; i++) {
-                file_promises.push(exportSlideToFile(art.slides[i]).then(uri => {
-                    console.log(uri)
-                    // This should be a constant value
-                    var idx = uri.indexOf('base64,') + 'base64,'.length;
-                    var content = uri.substring(idx);
-                    zip.file(`${title}/${i}.jpeg`, content, { base64: true, createFolders: true })
-
-                    return uri
-                }))
+                zip.file(`${title}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
             }
         }
 
-        Promise.allSettled(file_promises).then(file_uris => {
-            zip.generateAsync({ type: "blob" })
-                .then((blob) => {
-                    resolve("Ready to save")
-                    saveAs(blob, "collection.zip");
-                }).catch(reject)
-        })
+        zip.generateAsync({ type: "blob" }, progress_updater)
+            .then((blob) => {
+                resolve("Ready to save")
+                saveAs(blob, "collection.zip");
+            }).catch(reject)
     })
 }
 
@@ -452,6 +438,7 @@ function updateBlBkImageFabric(_canvas, slide_obj) {
                 resolve(_canvas.blBkImageFabric)
             },
             {
+                selectable: false,
                 crossOrigin: 'anonymous'
             }
         )
