@@ -81,7 +81,9 @@ document.getElementById('save-progress').addEventListener('click', () => {
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
     saveToBrowser(true)
-    exportToZip(mainData).finally(() => {
+    exportToZip(mainData, (progress_meta) => {
+        updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+    }).finally(() => {
         document.getElementById('loading-container').style.display = 'none'
     })
 })
@@ -430,8 +432,13 @@ function showLoading(){
     document.getElementById('loading-container').style.display = 'block'
 }
 
+function updateLoadingMessage(msg) {
+    document.querySelector("#loading-container > .loader-message").textContent = msg
+}
+
 function hideLoading() {
     document.getElementById('loading-container').style.display = 'none'
+    updateLoadingMessage("")
 }
 
 function createCollectionObj() {
