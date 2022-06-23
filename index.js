@@ -10,27 +10,35 @@ class CitationBlot extends Quill.import('blots/inline') { }
 CitationBlot.blotName = "citation"
 CitationBlot.tagName = "citation"
 Quill.register(CitationBlot)
+class CitationEndBlot extends Quill.import('blots/inline') { }
+CitationEndBlot.blotName = "citationEnd"
+CitationEndBlot.tagName = "citationEnd"
+Quill.register(CitationEndBlot)
 
 class CitationManager {
-    constructor(quill, options) {
+    constructor(quill, bibliography) {
         this.quill = quill;
-        this.options = options
+        this.bib = bibliography
         quill.on('text-change', this.update.bind(this))
     }
 
     update(delta, prev, source) {
         if (source === "user") {
             if (delta.ops.some(e => e.insert === "@")) {
-                // this.quill.history.undo()
                 const idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
-                this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
                 this.quill.enable(false)
                 getCitationId().then(res => {
                     const citation_id = res
                     if (citation_id !== undefined && citation_id !== "") {
-                        this.quill.insertText(idx_to_add + 1, citation_id, {
+                        this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
+
+                        this.quill.insertText(idx_to_add + 1, citation_id.slice(0, -1), {
                             "citation": true
                         })
+                        this.quill.insertText(idx_to_add + citation_id.length, citation_id.at(-1), {
+                            "citation": true,
+                            "citationEnd": true,
+                        }, 'api')
 
                         this.quill.setSelection(idx_to_add + 1 + citation_id.length)
                     } else {
@@ -38,11 +46,35 @@ class CitationManager {
                     }
                     this.quill.enable(true)
                 })
+
+            } else if (delta.ops.some(e => e?.insert !== undefined)) {
+                // Need to ensure that the recently added text is not a citation!
+                const format = this.quill.getFormat()
+                if (format?.citationEnd === true) {
+                    let curr_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
+                    curr_idx = (curr_idx === undefined) ? 0 : curr_idx;
+                    const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
+
+                    this.quill.deleteText(curr_idx, 1)
+
+                    this.quill.insertText(curr_idx, inserted_text, { "citation": false, "citationEnd": false })
+                    this.quill.setSelection(curr_idx + 1 + inserted_text.length)
+                }
+
             } else if (delta.ops.some(e => e?.delete !== undefined)) {
-                console.log(delta.ops)
-                console.log(prev)
+                if (this.quill.getFormat()?.citation && !this.quill.getFormat()?.citationEnd) {
+                    const [blot, offset] = this.quill.getLeaf(this.quill.getSelection().index)
+                    this.quill.deleteText(this.quill.getIndex(blot), blot.text.length)
+                } else {
+                    let deleted_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
+                    deleted_idx = (deleted_idx === undefined) ? 1 : deleted_idx + 1
+                    if (this.quill.getFormat(deleted_idx)?.citation) {
+                        const [blot, offset] = this.quill.getLeaf(deleted_idx)
+                        this.quill.deleteText(this.quill.getIndex(blot), blot.text.length + 1)
+                    }
+                }
+
             }
-            console.log(this.quill.getContents())
         }
     }
 }
@@ -69,6 +101,7 @@ const quillSlide = new Quill('#slide_content', {
         'script',
         'list',
         'citation',
+        'citationEnd',
     ]
 });
 
