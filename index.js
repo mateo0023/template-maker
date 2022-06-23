@@ -6,12 +6,58 @@ var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
 
+class CitationBlot extends Quill.import('blots/inline') { }
+CitationBlot.blotName = "citation"
+CitationBlot.tagName = "citation"
+Quill.register(CitationBlot)
+
+class CitationManager {
+    constructor(quill, options) {
+        this.quill = quill;
+        this.options = options
+        quill.on('text-change', this.update.bind(this))
+    }
+
+    update(delta, prev, source) {
+        if (source === "user") {
+            if (delta.ops.some(e => e.insert === "@")) {
+                // this.quill.history.undo()
+                const idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
+                this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
+                this.quill.enable(false)
+                getCitationId().then(res => {
+                    const citation_id = res
+                    if (citation_id !== undefined && citation_id !== "") {
+                        this.quill.insertText(idx_to_add + 1, citation_id, {
+                            "citation": true
+                        })
+
+                        this.quill.setSelection(idx_to_add + 1 + citation_id.length)
+                    } else {
+                        this.quill.deleteText(idx_to_add, 1)
+                    }
+                    this.quill.enable(true)
+                })
+            } else if (delta.ops.some(e => e?.delete !== undefined)) {
+                console.log(delta.ops)
+                console.log(prev)
+            }
+            console.log(this.quill.getContents())
+        }
+    }
+}
+
+Quill.register('modules/citation', CitationManager)
+
 const quillSlide = new Quill('#slide_content', {
     modules: {
         toolbar: "#toolbar",
         history: {
             maxStack: 250,
             userOnly: true
+        },
+        citation: {
+
         }
     },
     placeholder: 'Enter the contents of the slide',
@@ -22,6 +68,7 @@ const quillSlide = new Quill('#slide_content', {
         'link',
         'script',
         'list',
+        'citation',
     ]
 });
 
@@ -264,6 +311,12 @@ document.getElementById('move_slide_down').addEventListener('click', () => {
     moveSlideDown()
 })
 
+function getCitationId() {
+    return new Promise((resolve, rej) => {
+        resolve("aberastury2022")
+    })
+}
+
 function draggoverHandler(e) {
     e.stopPropagation()
     e.preventDefault()
@@ -331,7 +384,7 @@ function updateArticlesList(update_current = true) {
 
                 quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
                 quillDescription.history.clear();
-    
+
                 quillArticle.setContents(currentArticle?.article)
                 quillArticle.history.clear();
             })
@@ -343,7 +396,7 @@ function updateArticlesList(update_current = true) {
 
         quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
         quillDescription.history.clear();
-    
+
         quillArticle.setContents(currentArticle?.article)
         quillArticle.history.clear();
 
