@@ -16,9 +16,10 @@ CitationEndBlot.tagName = "citationEnd"
 Quill.register(CitationEndBlot)
 
 class CitationManager {
-    constructor(quill, bibliography) {
+    constructor(quill, options) {
         this.quill = quill;
-        this.bib = bibliography
+        this.options = options
+        this.bib = options?.bibliography
         quill.on('text-change', this.update.bind(this))
     }
 
@@ -27,7 +28,7 @@ class CitationManager {
             if (delta.ops.some(e => e.insert === "@")) {
                 const idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
                 this.quill.enable(false)
-                getCitationId().then(res => {
+                this.#getCitationId(idx_to_add+1).then(res => {
                     const citation_id = res
                     if (citation_id !== undefined && citation_id !== "") {
                         this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
@@ -55,16 +56,32 @@ class CitationManager {
                     curr_idx = (curr_idx === undefined) ? 0 : curr_idx;
                     const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
 
-                    this.quill.deleteText(curr_idx, 1)
+                    this.quill.deleteText(curr_idx, inserted_text.length)
 
                     this.quill.insertText(curr_idx, inserted_text, { "citation": false, "citationEnd": false })
-                    this.quill.setSelection(curr_idx + 1 + inserted_text.length)
+                    this.quill.setSelection(curr_idx + inserted_text.length)
+                } else if (format?.citation === true) {
+                    let curr_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
+                    curr_idx = (curr_idx === undefined) ? 0 : curr_idx;
+                    const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
+
+                    this.quill.deleteText(curr_idx, inserted_text.length)
+
+                    const [blot, offset] = this.quill.getLeaf(curr_idx)
+                    // The +1 is because of the citationEnd character
+                    this.quill.setSelection(this.quill.getIndex(blot) + blot.text.length + 1)
                 }
 
             } else if (delta.ops.some(e => e?.delete !== undefined)) {
                 if (this.quill.getFormat()?.citation && !this.quill.getFormat()?.citationEnd) {
                     const [blot, offset] = this.quill.getLeaf(this.quill.getSelection().index)
                     this.quill.deleteText(this.quill.getIndex(blot), blot.text.length)
+                    
+                    // Delete the final citationEnd tag
+                    const idx = this.quill.getSelection().index
+                    if (this.quill.getFormat(idx, 1)?.citationEnd) {
+                        this.quill.deleteText(idx, 1)
+                    }
                 } else {
                     let deleted_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
                     deleted_idx = (deleted_idx === undefined) ? 1 : deleted_idx + 1
@@ -76,6 +93,22 @@ class CitationManager {
 
             }
         }
+    }
+
+    #getCitationId(idx){
+        return new Promise((resolve, reject) => {
+            // const [blot, offset] = this.quill.getLeaf(idx)
+            
+            // const citation_list = this.#getCitationList()
+            resolve("aberastury2022")
+        })
+    }
+
+    #getCitationList() {
+        return [
+            {id: "aberastury2022", txt: "Title, Author, URL"},
+            {id: "perez2011", txt: "Title2, Author2, URL2sz"},
+        ]
     }
 }
 
@@ -343,12 +376,6 @@ document.getElementById('move_slide_up').addEventListener('click', () => {
 document.getElementById('move_slide_down').addEventListener('click', () => {
     moveSlideDown()
 })
-
-function getCitationId() {
-    return new Promise((resolve, rej) => {
-        resolve("aberastury2022")
-    })
-}
 
 function draggoverHandler(e) {
     e.stopPropagation()
