@@ -145,7 +145,9 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
                 zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
             }
 
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+            if(art?.desc !== undefined){
+                zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+            }
             for (let i = 0; i < art.slides.length; i++) {
                 zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
             }
