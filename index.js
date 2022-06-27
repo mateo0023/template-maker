@@ -1,4 +1,5 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
+// import { Cite } from './lib/citation.js'
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -6,16 +7,16 @@ var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
 
-class CitationBlot extends Quill.import('blots/inline') { }
-CitationBlot.blotName = "citation"
-CitationBlot.tagName = "citation"
-Quill.register(CitationBlot)
-class CitationEndBlot extends Quill.import('blots/inline') { }
-CitationEndBlot.blotName = "citationEnd"
-CitationEndBlot.tagName = "citationEnd"
-Quill.register(CitationEndBlot)
+class QuillCitationBlot extends Quill.import('blots/inline') { }
+QuillCitationBlot.blotName = "citation"
+QuillCitationBlot.tagName = "citation"
+Quill.register(QuillCitationBlot)
+class QuillCitationEndBlot extends Quill.import('blots/inline') { }
+QuillCitationEndBlot.blotName = "citationEnd"
+QuillCitationEndBlot.tagName = "citationEnd"
+Quill.register(QuillCitationEndBlot)
 
-class CitationManager {
+class QuillCitationManager {
     constructor(quill, options) {
         this.quill = quill;
         this.options = options
@@ -28,7 +29,7 @@ class CitationManager {
             if (delta.ops.some(e => e.insert === "@")) {
                 const idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
                 this.quill.enable(false)
-                this.#getCitationId(idx_to_add+1).then(res => {
+                this.#getCitationId(idx_to_add + 1).then(res => {
                     const citation_id = res
                     if (citation_id !== undefined && citation_id !== "") {
                         this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
@@ -67,16 +68,19 @@ class CitationManager {
 
                     this.quill.deleteText(curr_idx, inserted_text.length)
 
-                    const [blot, offset] = this.quill.getLeaf(curr_idx)
+                    // The setSelection isn't working for some reason
+                    // const [blot, offset] = this.quill.getLeaf(curr_idx)
                     // The +1 is because of the citationEnd character
-                    this.quill.setSelection(this.quill.getIndex(blot) + blot.text.length + 1)
+                    // const end_idx = this.quill.getIndex(blot) + blot.text.length + 1
+                    // this.quill.insertText(end_idx, inserted_text, { "citation": false, "citationEnd": false })
+                    // this.quill.setSelection(end_idx + inserted_text.length-1)
                 }
 
             } else if (delta.ops.some(e => e?.delete !== undefined)) {
                 if (this.quill.getFormat()?.citation && !this.quill.getFormat()?.citationEnd) {
                     const [blot, offset] = this.quill.getLeaf(this.quill.getSelection().index)
                     this.quill.deleteText(this.quill.getIndex(blot), blot.text.length)
-                    
+
                     // Delete the final citationEnd tag
                     const idx = this.quill.getSelection().index
                     if (this.quill.getFormat(idx, 1)?.citationEnd) {
@@ -95,24 +99,45 @@ class CitationManager {
         }
     }
 
-    #getCitationId(idx){
+    #getCitationId(quill_idx) {
         return new Promise((resolve, reject) => {
-            // const [blot, offset] = this.quill.getLeaf(idx)
-            
-            // const citation_list = this.#getCitationList()
+            // First create the dropdown
+            const drop_container = document.getElementById('citaitons-dropdown')
+            const srcs_container = document.getElementById('sources-container')
+
+            // const position = document.getElementById()
+
+            console.log(this.quill.getLeaf(quill_idx-1)[0].domNode)
+
+            document.getElementById('citation-search').value = ""
+            while (srcs_container.firstChild) {
+                srcs_container.removeChild(srcs_container.firstChild);
+            }
+
+            for (const id in ['hello', 'world']) {
+                const item = document.createElement('div')
+                item.innerHTML = id
+
+                // Item should resolve the promise once clicked and hide everything
+                item.addEventListener('click', (e) => {
+                    drop_container.classList.toggle('hidden')
+                    resolve(id)
+                })
+            }
+
             resolve("aberastury2022")
         })
     }
 
     #getCitationList() {
         return [
-            {id: "aberastury2022", txt: "Title, Author, URL"},
-            {id: "perez2011", txt: "Title2, Author2, URL2sz"},
+            { id: "aberastury2022", txt: "Title, Author, URL" },
+            { id: "perez2011", txt: "Title2, Author2, URL2sz" },
         ]
     }
 }
 
-Quill.register('modules/citation', CitationManager)
+Quill.register('modules/citation', QuillCitationManager)
 
 const quillSlide = new Quill('#slide_content', {
     modules: {
@@ -150,6 +175,19 @@ const quillDescription = new Quill('#article-description', {
     theme: 'snow',
     formats: []
 });
+
+const quillSources = new Quill('#sources-intput', {
+    modules: {
+        toolbar: "",
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
+    },
+    placeholder: 'Article\'s Sources',
+    theme: 'snow',
+    formats: []
+})
 
 const quillArticle = new Quill('#article-qill', {
     modules: {
@@ -207,9 +245,15 @@ quillSlide.on('text-change', (delta, oldContents, source) => {
 })
 
 // When you change slide contents
-quillDescription.on('text-change', (delta, oldContents, source) => {
+quillDescription.on('text-change', (delta, old_contents, source) => {
     if (currentArticle && source === "user") {
         currentArticle.desc = quillDescription.getText();
+    }
+})
+
+quillSources.on('text-change', (delta, old_content, source) => {
+    if (currentArticle && source === "user") {
+        currentArticle.bib = new Cite(quillSources.getText())
     }
 })
 
@@ -377,6 +421,20 @@ document.getElementById('move_slide_down').addEventListener('click', () => {
     moveSlideDown()
 })
 
+// Searching for citation ids
+document.getElementById('citation-search').addEventListener('input', e => {
+    const filter = e.target.value.toUpperCase();
+    const items = document.getElementById("sources-container").getElementsByTagName("div");
+    for (var i = 0; i < items.length; i++) {
+        var txtValue = items[i].textContent || items[i].innerText;
+        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+            items[i].style.display = "";
+        } else {
+            items[i].style.display = "none";
+        }
+    }
+})
+
 function draggoverHandler(e) {
     e.stopPropagation()
     e.preventDefault()
@@ -407,8 +465,8 @@ function dropHandler(e, slide = currentSlide) {
                 html_data.innerHTML = e.dataTransfer.getData('text/html')
                 if (url.searchParams.has('imgurl')) {
                     slide.img.src = url.searchParams.get('imgurl')
-                } else if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
-                    slide.img.src = html_data.getElementsByTagName('img')[0].src
+                    // } if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
+                    //     slide.img.src = html_data.getElementsByTagName('img')[0].src
                 } else {
                     slide.img.src = url.href
                 }
