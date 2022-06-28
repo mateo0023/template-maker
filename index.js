@@ -130,53 +130,49 @@ document.getElementById('save-progress').addEventListener('click', () => {
 })
 
 document.getElementById('export-btn').addEventListener('click', (e) => {
+    showLoading()
     saveToBrowser(true)
-    const exportPromise = new Promise((resolve, reject) => {
-        var zip = new JSZip()
+    var zip = new JSZip()
 
-        zip.file('collection.json', JSON.stringify(mainData))
+    zip.file('collection.json', JSON.stringify(mainData))
 
-        for (const art of mainData.articles) {
-            const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
+    for (const art of mainData.articles) {
+        const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
 
-            if (art?.article !== undefined) {
-                quillArticle.setContents(art.article)
-                zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
-                zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
-            }
-
-            if (art?.desc !== undefined) {
-                zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
-            }
-            for (let i = 0; i < art.slides.length; i++) {
-                zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
-            }
+        if (art?.article !== undefined) {
+            quillArticle.setContents(art.article)
+            zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
+            zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
         }
 
-        zip.generateAsync({ type: "base64" }, (progress_meta) => {
-            updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+        if (art?.desc !== undefined) {
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+        }
+        for (let i = 0; i < art.slides.length; i++) {
+            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
+        }
+    }
+
+    zip.generateAsync({ type: "base64" }, (progress_meta) => {
+        updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+        console.log(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
+    })
+        .then((uri) => {
+            var download_el = document.createElement('a');
+            download_el.setAttribute('href', "data:application/zip;base64," + uri);
+            download_el.setAttribute('download', 'collection.zip');
+
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                download_el.dispatchEvent(event);
+            }
+            else {
+                download_el.click();
+            }
+        }).finally(() => {
+            hideLoading()
         })
-            .then((uri) => {
-                var download_el = document.createElement('a');
-                download_el.setAttribute('href', "data:application/zip;base64," + uri);
-                download_el.setAttribute('download', 'collection.zip');
-
-                if (document.createEvent) {
-                    var event = document.createEvent('MouseEvents');
-                    event.initEvent('click', true, true);
-                    download_el.dispatchEvent(event);
-                    resolve(uri)
-                }
-                else {
-                    download_el.click();
-                    resolve(uri)
-                }
-            }).catch(reject)
-    })
-
-    exportPromise.finally(() => {
-        document.getElementById('loading-container').style.display = 'none'
-    })
 })
 
 
