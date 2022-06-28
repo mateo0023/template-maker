@@ -155,7 +155,6 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 
     zip.generateAsync({ type: "base64" }, (progress_meta) => {
         updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
-        console.log(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
     })
         .then((uri) => {
             var download_el = document.createElement('a');
