@@ -145,7 +145,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
                 zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
             }
 
-            if(art?.desc !== undefined){
+            if (art?.desc !== undefined) {
                 zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
             }
             for (let i = 0; i < art.slides.length; i++) {
@@ -153,12 +153,24 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
             }
         }
 
-        zip.generateAsync({ type: "blob" }, (progress_meta) => {
+        zip.generateAsync({ type: "base64" }, (progress_meta) => {
             updateLoadingMessage(`Compressing Zip: ${progress_meta.percent.toFixed(2)}%`)
         })
-            .then((blob) => {
-                resolve("Ready to save")
-                saveAs(blob, "collection.zip");
+            .then((uri) => {
+                var download_el = document.createElement('a');
+                download_el.setAttribute('href', "data:application/zip;base64," + uri);
+                download_el.setAttribute('download', 'collection.zip');
+
+                if (document.createEvent) {
+                    var event = document.createEvent('MouseEvents');
+                    event.initEvent('click', true, true);
+                    download_el.dispatchEvent(event);
+                    resolve(uri)
+                }
+                else {
+                    download_el.click();
+                    resolve(uri)
+                }
             }).catch(reject)
     })
 
@@ -333,7 +345,7 @@ function updateArticlesList(update_current = true) {
 
                 quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
                 quillDescription.history.clear();
-    
+
                 quillArticle.setContents(currentArticle?.article)
                 quillArticle.history.clear();
             })
@@ -345,7 +357,7 @@ function updateArticlesList(update_current = true) {
 
         quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
         quillDescription.history.clear();
-    
+
         quillArticle.setContents(currentArticle?.article)
         quillArticle.history.clear();
 
