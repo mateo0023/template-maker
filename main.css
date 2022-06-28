@@ -139,3 +139,8 @@ citation {
     padding: 16px;
     background-color: aqua;
 }
+
+#citaitons-dropdown {
+    position: absolute;
+    background-color: #ddd;
+}

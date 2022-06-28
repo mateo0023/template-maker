@@ -1,5 +1,5 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-// import { Cite } from './lib/citation.js'
+// import { Cite } from "./lib/citation.js"
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -27,8 +27,13 @@ class QuillCitationManager {
     update(delta, prev, source) {
         if (source === "user") {
             if (delta.ops.some(e => e.insert === "@")) {
-                const idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
+                var idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
                 this.quill.enable(false)
+                if (this.quill.getFormat()?.citationEnd === true) {
+                    this.quill.deleteText(idx_to_add, 1)
+                    this.quill.insertText(idx_to_add, ",@", { "citation": false, "citationEnd": false })
+                    idx_to_add++;
+                }
                 this.#getCitationId(idx_to_add + 1).then(res => {
                     const citation_id = res
                     if (citation_id !== undefined && citation_id !== "") {
@@ -104,28 +109,40 @@ class QuillCitationManager {
             // First create the dropdown
             const drop_container = document.getElementById('citaitons-dropdown')
             const srcs_container = document.getElementById('sources-container')
+            const search_box = document.getElementById('citation-search')
+            drop_container.classList.remove('hidden')
 
-            // const position = document.getElementById()
+            const { left, top } = this.quill.container.getBoundingClientRect()
+            drop_container.style.left = `${left + this.quill.getBounds(quill_idx).left}px`
+            drop_container.style.top = `${top + this.quill.getBounds(quill_idx).top}px`
 
-            console.log(this.quill.getLeaf(quill_idx-1)[0].domNode)
+            search_box.value = ""
+            search_box.onblur = (e) => {
+                if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
+                    drop_container.classList.add('hidden')
+                    reject('Clicked Away');
+                }
+            }
 
-            document.getElementById('citation-search').value = ""
             while (srcs_container.firstChild) {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-            for (const id in ['hello', 'world']) {
+            for (const id of ['hello', 'world']) {
                 const item = document.createElement('div')
                 item.innerHTML = id
+                item.classList.add('citation-list-item')
 
                 // Item should resolve the promise once clicked and hide everything
                 item.addEventListener('click', (e) => {
-                    drop_container.classList.toggle('hidden')
+                    drop_container.classList.add('hidden')
                     resolve(id)
                 })
+
+                srcs_container.appendChild(item)
             }
 
-            resolve("aberastury2022")
+            search_box.focus()
         })
     }
 
@@ -253,7 +270,8 @@ quillDescription.on('text-change', (delta, old_contents, source) => {
 
 quillSources.on('text-change', (delta, old_content, source) => {
     if (currentArticle && source === "user") {
-        currentArticle.bib = new Cite(quillSources.getText())
+        console.log(`Still Working adding this to bib: ${quillSources.getText()}`)
+        // currentArticle.bib = new Cite(quillSources.getText())
     }
 })
 
