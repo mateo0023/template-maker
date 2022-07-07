@@ -51,6 +51,9 @@ class QuillCitationManager {
                     } else {
                         this.quill.deleteText(idx_to_add, 1)
                     }
+                }).catch(err => {
+                    this.quill.deleteText(idx_to_add, 1)
+                }).finally(() => {
                     this.quill.enable(true)
                 })
 
@@ -72,16 +75,12 @@ class QuillCitationManager {
                     const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
 
                     this.quill.deleteText(curr_idx, inserted_text.length)
-
-                    // The setSelection isn't working for some reason
-                    // const [blot, offset] = this.quill.getLeaf(curr_idx)
-                    // The +1 is because of the citationEnd character
-                    // const end_idx = this.quill.getIndex(blot) + blot.text.length + 1
-                    // this.quill.insertText(end_idx, inserted_text, { "citation": false, "citationEnd": false })
-                    // this.quill.setSelection(end_idx + inserted_text.length-1)
                 }
 
             } else if (delta.ops.some(e => e?.delete !== undefined)) {
+                // Need to remove from the citation list.
+
+                // Remove the entire citation block
                 if (this.quill.getFormat()?.citation && !this.quill.getFormat()?.citationEnd) {
                     const [blot, offset] = this.quill.getLeaf(this.quill.getSelection().index)
                     this.quill.deleteText(this.quill.getIndex(blot), blot.text.length)
@@ -128,7 +127,7 @@ class QuillCitationManager {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-            for (const id of ['hello', 'world']) {
+            for (const id of ['aguera-arcasLargeLanguageModels2022', 'antonySecretaryBlinkenRemarks2021', 'thoppilanLaMDALanguageModels2022']) {
                 const item = document.createElement('div')
                 item.innerHTML = id
                 item.classList.add('citation-list-item')
@@ -151,6 +150,36 @@ class QuillCitationManager {
             { id: "aberastury2022", txt: "Title, Author, URL" },
             { id: "perez2011", txt: "Title2, Author2, URL2sz" },
         ]
+    }
+}
+
+class CitationManager {
+    constructor() {
+        this.cite_order = new Array()
+    }
+
+    addParent(){
+        const new_id = Date.now()
+        this.cite_order.push({
+            id: new_id,
+            citations: new Array()
+        })
+        return new_id
+    }
+
+    cite(key, parent_id){
+        const new_id = Date.now()
+        this.cite_order.find(
+            parent => parent.id === parent_id
+        ).push({
+            id: new_id,
+            key: key,
+        })
+        return new_id
+    }
+
+    removeCitation(parent, id){
+        this.cite_order
     }
 }
 
