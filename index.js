@@ -1,7 +1,7 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
 
 // Main data object
-const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
+var mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
@@ -175,6 +175,59 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 })
 
 
+document.getElementById('import-btn').addEventListener('click', () => {
+    // Cannot use the show/hide loading since there's no Cancel event
+    // showLoading()
+
+    // Promise resolves with loaded data
+    const loading_promise = new Promise((resolve, reject) => {
+        const file_loader = document.createElement('input')
+        file_loader.type = "file"
+        file_loader.accept = ".json,.zip"
+
+        file_loader.addEventListener('input', (e) => {
+            try {
+                // ZIP File
+                if (file_loader.files[0].name.endsWith('zip')) {
+                    JSZip.loadAsync(file_loader.files[0])
+                        .then((zip) => {
+                            zip.file('collection.json').async("string").then(result => {
+                                // console.log(result)
+                                resolve(JSON.parse(result))
+                            }).catch(reject)
+                        })
+                        .catch(reject)
+                } else {
+                    const reader = new FileReader();
+
+                    reader.addEventListener("load", () => {
+                        resolve(JSON.parse(reader.result))
+                    }, false);
+
+                    reader.readAsText(file_loader.files[0])
+                }
+            } catch (error) {
+                reject(error)
+            }
+        })
+
+        file_loader.click()
+
+        // Reject the promise if file not selected in 10 seconds
+        setTimeout(() => reject('Timeout'), 10000);
+    })
+
+    loading_promise
+        .then(data => {
+            console.log("Done")
+            mainData = data;
+            saveToBrowser(false)
+            updateArticlesList()
+        })
+        .catch(err => { console.log(err) })
+})
+
+
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
     saveProgressToObj()
     for (const el of document.getElementsByClassName('instagram')) {
@@ -210,13 +263,11 @@ document.getElementById('canvas-container').addEventListener("dragover", draggov
 // Something dropped over the canvas container
 document.getElementById('canvas-container').addEventListener("drop", (e) => {
     showLoading()
-    dropHandler(e, currentSlide).then(slide => {
-        updateImagePreview(slide).finally(() => {
-            hideLoading()
+    dropHandler(e, currentSlide)
+        .then(slide => {
+            updateImagePreview(slide).finally(hideLoading)
         })
-    }).catch(() => {
-        hideLoading()
-    })
+        .finally(hideLoading)
 })
 
 document.getElementById('image-load-btn').addEventListener('click', e => {
