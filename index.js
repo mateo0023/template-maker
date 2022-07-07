@@ -1,7 +1,7 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
 
 // Main data object
-var mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
+const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
@@ -219,8 +219,9 @@ document.getElementById('import-btn').addEventListener('click', () => {
 
     loading_promise
         .then(data => {
-            console.log("Done")
-            mainData = data;
+            for(const article of data.articles) {
+                mainData.articles.push(article)
+            }
             saveToBrowser(false)
             updateArticlesList()
         })
