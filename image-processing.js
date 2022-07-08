@@ -142,7 +142,6 @@ function createImage(_canvas, slide_obj) {
 function exportSlideToJpegData(slide_obj) {
     var _canvas = createGhostCanvas()
     return createImage(_canvas, slide_obj).then(result => {
-        console.log(result)
         return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
