@@ -63,11 +63,15 @@ body {
     z-index: 2;
 }
 
-.loader {
+.loader-container {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
+}
+
+.loader {
+    margin: 0 auto;
     border: 16px solid #f3f3f3;
     border-radius: 50%;
     border-top: 16px solid #3498db;
@@ -97,6 +101,12 @@ body {
     100% {
         transform: rotate(360deg);
     }
+}
+
+.loader-message {
+    margin: 0 auto;
+    color: white;
+    font-size: 1.2em;
 }
 
 .hidden {

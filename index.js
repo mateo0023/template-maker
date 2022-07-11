@@ -593,7 +593,7 @@ function showLoading() {
 }
 
 function updateLoadingMessage(msg) {
-    document.querySelector("#loading-container > .loader-message").textContent = msg
+    document.querySelector(".loader-container > .loader-message").textContent = msg
 }
 
 function hideLoading() {
