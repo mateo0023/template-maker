@@ -517,11 +517,12 @@ function processContent(_canvas, content_obj) {
             if (content_obj.ops[i].attributes.list == 'bullet') {
                 // Add the bullet
                 const lines = text.split('\n')
+                const moving_from = working_idx - lines[lines.length - 1].length
+                
                 lines[lines.length - 1] = "• " + lines[lines.length - 1]
                 text = lines.join('\n')
                 
                 // Update the shifted ranges shifted by adding "• "
-                const moving_from = working_idx - lines[lines.length - 1].length
                 for (const format_range_list of [bold_ranges, italic_ranges, superscript_ranges, subscript_ranges]) {
                     for (const range of format_range_list) {
                         if (range[0] >= moving_from) {
@@ -530,7 +531,7 @@ function processContent(_canvas, content_obj) {
                         }
                     }
                 }
-                working_idx +=2
+                working_idx += 2
             }
         }
 
