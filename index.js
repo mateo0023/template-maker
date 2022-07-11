@@ -1,5 +1,6 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-// import { Cite } from "./lib/citation.js"
+
+const Parchment = Quill.import('parchment')
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -7,98 +8,61 @@ var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
 
-class QuillCitationBlot extends Quill.import('blots/inline') { }
+class QuillCitationBlot extends Parchment.Embed {
+
+    static create(value) {
+        let node = super.create();
+        node.setAttribute('key', value.key);
+        node.setAttribute('citation_manager', value.manager)
+        node.setAttribute('contenteditable', false);
+        node.textContent = `@${value.key}`
+        // node.textContent = getString(node);
+        return node;
+    }
+
+    static value(node) {
+        return {
+            key: node.getAttribute('key')
+        }
+    }
+}
 QuillCitationBlot.blotName = "citation"
 QuillCitationBlot.tagName = "citation"
 Quill.register(QuillCitationBlot)
-class QuillCitationEndBlot extends Quill.import('blots/inline') { }
-QuillCitationEndBlot.blotName = "citationEnd"
-QuillCitationEndBlot.tagName = "citationEnd"
-Quill.register(QuillCitationEndBlot)
 
 class QuillCitationManager {
     constructor(quill, options) {
         this.quill = quill;
         this.options = options
-        this.bib = options?.bibliography
+        // this.manager = options.manager
         quill.on('text-change', this.update.bind(this))
     }
 
     update(delta, prev, source) {
+        console.log(this.quill.getContents())
         if (source === "user") {
             if (delta.ops.some(e => e.insert === "@")) {
-                var idx_to_add = delta.ops.find(e => e?.retain !== undefined).retain
+                const retain_obj = delta.ops.find(e => e?.retain !== undefined)
+                const idx_to_add = (retain_obj === undefined) ? 0 : retain_obj.retain
+
                 this.quill.enable(false)
-                if (this.quill.getFormat()?.citationEnd === true) {
-                    this.quill.deleteText(idx_to_add, 1)
-                    this.quill.insertText(idx_to_add, ",@", { "citation": false, "citationEnd": false })
-                    idx_to_add++;
-                }
                 this.#getCitationId(idx_to_add + 1).then(res => {
                     const citation_id = res
                     if (citation_id !== undefined && citation_id !== "") {
-                        this.quill.formatText(idx_to_add, 1, { "citation": true }, 'api')
+                        this.quill.deleteText(idx_to_add, 1)
 
-                        this.quill.insertText(idx_to_add + 1, citation_id.slice(0, -1), {
-                            "citation": true
-                        })
-                        this.quill.insertText(idx_to_add + citation_id.length, citation_id.at(-1), {
-                            "citation": true,
-                            "citationEnd": true,
-                        }, 'api')
+                        this.quill.insertEmbed(idx_to_add, 'citation', { idx: 0, key: citation_id }, 'api')
 
-                        this.quill.setSelection(idx_to_add + 1 + citation_id.length)
+                        this.quill.enable(true)
+                        this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
                     } else {
+                        this.quill.enable(true)
                         this.quill.deleteText(idx_to_add, 1)
                     }
                 }).catch(err => {
                     this.quill.deleteText(idx_to_add, 1)
-                }).finally(() => {
                     this.quill.enable(true)
                 })
-
-            } else if (delta.ops.some(e => e?.insert !== undefined)) {
-                // Need to ensure that the recently added text is not a citation!
-                const format = this.quill.getFormat()
-                if (format?.citationEnd === true) {
-                    let curr_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
-                    curr_idx = (curr_idx === undefined) ? 0 : curr_idx;
-                    const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
-
-                    this.quill.deleteText(curr_idx, inserted_text.length)
-
-                    this.quill.insertText(curr_idx, inserted_text, { "citation": false, "citationEnd": false })
-                    this.quill.setSelection(curr_idx + inserted_text.length)
-                } else if (format?.citation === true) {
-                    let curr_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
-                    curr_idx = (curr_idx === undefined) ? 0 : curr_idx;
-                    const inserted_text = delta.ops.find(e => e.insert !== undefined).insert
-
-                    this.quill.deleteText(curr_idx, inserted_text.length)
-                }
-
-            } else if (delta.ops.some(e => e?.delete !== undefined)) {
-                // Need to remove from the citation list.
-
-                // Remove the entire citation block
-                if (this.quill.getFormat()?.citation && !this.quill.getFormat()?.citationEnd) {
-                    const [blot, offset] = this.quill.getLeaf(this.quill.getSelection().index)
-                    this.quill.deleteText(this.quill.getIndex(blot), blot.text.length)
-
-                    // Delete the final citationEnd tag
-                    const idx = this.quill.getSelection().index
-                    if (this.quill.getFormat(idx, 1)?.citationEnd) {
-                        this.quill.deleteText(idx, 1)
-                    }
-                } else {
-                    let deleted_idx = delta.ops.find(e => e?.retain !== undefined)?.retain
-                    deleted_idx = (deleted_idx === undefined) ? 1 : deleted_idx + 1
-                    if (this.quill.getFormat(deleted_idx)?.citation) {
-                        const [blot, offset] = this.quill.getLeaf(deleted_idx)
-                        this.quill.deleteText(this.quill.getIndex(blot), blot.text.length + 1)
-                    }
-                }
-
             }
         }
     }
@@ -144,13 +108,6 @@ class QuillCitationManager {
             search_box.focus()
         })
     }
-
-    #getCitationList() {
-        return [
-            { id: "aberastury2022", txt: "Title, Author, URL" },
-            { id: "perez2011", txt: "Title2, Author2, URL2sz" },
-        ]
-    }
 }
 
 class CitationManager {
@@ -158,7 +115,7 @@ class CitationManager {
         this.cite_order = new Array()
     }
 
-    addParent(){
+    addParent() {
         const new_id = Date.now()
         this.cite_order.push({
             id: new_id,
@@ -167,19 +124,22 @@ class CitationManager {
         return new_id
     }
 
-    cite(key, parent_id){
-        const new_id = Date.now()
-        this.cite_order.find(
-            parent => parent.id === parent_id
-        ).push({
-            id: new_id,
-            key: key,
-        })
-        return new_id
+    updateCitations(parent_id, quill){
+        const new_citations = new Array()
+        for(const item of (quillSlide instanceof Quill) ? quill.getContents().ops : quill.ops){
+            if(item?.citation !== undefined && !new_citations.includes(item.citation.key)){
+                new_citations.push(item.citation.key)
+            }
+        }
+        this.cite_order.find(e => e.id === parent_id).citations = new_citations
     }
 
-    removeCitation(parent, id){
-        this.cite_order
+    moveParentUp(id) {
+        moveItemUpInArray(this.cite_order.find(e => e.id === id), this.cite_order)
+    }
+
+    moveParentDown(id) {
+        moveItemDownInArray(this.cite_order.find(e => e.id === id), this.cite_order)
     }
 }
 
@@ -205,7 +165,7 @@ const quillSlide = new Quill('#slide_content', {
         'script',
         'list',
         'citation',
-        'citationEnd',
+        // 'citationEnd',
     ]
 });
 
@@ -423,7 +383,7 @@ document.getElementById('import-btn').addEventListener('click', () => {
 
     loading_promise
         .then(data => {
-            for(const article of data.articles) {
+            for (const article of data.articles) {
                 mainData.articles.push(article)
             }
             saveToBrowser(false)
@@ -739,11 +699,7 @@ function removeSlide() {
 function moveSlideUp() {
     saveProgressToObj()
 
-    let old_idx = currentArticle.slides.indexOf(currentSlide)
-    if (old_idx > 0) {
-        [currentArticle.slides[old_idx - 1], currentArticle.slides[old_idx]] =
-            [currentArticle.slides[old_idx], currentArticle.slides[old_idx - 1]]
-    }
+    moveItemUpInArray(currentSlide, currentArticle.slides)
 
     updateSlidesList(false)
 }
@@ -751,11 +707,7 @@ function moveSlideUp() {
 function moveSlideDown() {
     saveProgressToObj()
 
-    let old_idx = currentArticle.slides.indexOf(currentSlide)
-    if (old_idx < currentArticle.slides.length - 1) {
-        [currentArticle.slides[old_idx], currentArticle.slides[old_idx + 1]] =
-            [currentArticle.slides[old_idx + 1], currentArticle.slides[old_idx]]
-    }
+    moveItemDownInArray(currentSlide, currentArticle.slides)
 
     updateSlidesList(false)
 }
@@ -855,6 +807,22 @@ function removeItemFromArr(arr, item) {
         }
     }
     return false;
+}
+
+function moveItemUpInArray(item, array){
+    const old_idx = array.indexOf(item)
+    if (old_idx > 0) {
+        [array[old_idx - 1], array[old_idx]] =
+            [array[old_idx], array[old_idx - 1]]
+    }
+}
+
+function moveItemDownInArray(item, array){
+    const old_idx = array.indexOf(item)
+    if (old_idx < array.length - 1) {
+        [array[old_idx], array[old_idx + 1]] =
+            [array[old_idx + 1], array[old_idx]]
+    }
 }
 
 function clearSelected(el) {
