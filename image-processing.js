@@ -530,6 +530,7 @@ function processContent(_canvas, content_obj) {
                         }
                     }
                 }
+                working_idx +=2
             }
         }
 
