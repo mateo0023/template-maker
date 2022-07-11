@@ -495,23 +495,10 @@ function processContent(_canvas, content_obj) {
     const superscript_ranges = new Array()
     const subscript_ranges = new Array()
 
-    let prev_bullet_idx = 0;
     let working_idx = 0;
     for (let i = 0; i < content_obj?.ops?.length; i++) {
         let temp_txt;
-        let new_bullet_idx = checkIfIsBullet(content_obj.ops, i)
-
-        if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
-            prev_bullet_idx = new_bullet_idx
-
-            // Make sure that to add the bullet to the last line of the text item
-            const lines = content_obj.ops[i].insert.split('\n')
-            lines[lines.length - 1] = "• " + lines[lines.length - 1]
-
-            temp_txt = lines.join('\n')
-        } else {
-            temp_txt = content_obj.ops[i].insert
-        }
+        temp_txt = content_obj.ops[i].insert
 
         if (content_obj.ops[i].attributes !== undefined) {
             if (content_obj.ops[i].attributes.bold) {
@@ -525,6 +512,23 @@ function processContent(_canvas, content_obj) {
                     superscript_ranges.push([working_idx, working_idx + temp_txt.length])
                 } else if (content_obj.ops[i].attributes.script === "sub") {
                     subscript_ranges.push([working_idx, working_idx + temp_txt.length])
+                }
+            }
+            if (content_obj.ops[i].attributes.list == 'bullet') {
+                // Add the bullet
+                const lines = text.split('\n')
+                lines[lines.length - 1] = "• " + lines[lines.length - 1]
+                text = lines.join('\n')
+                
+                // Update the shifted ranges shifted by adding "• "
+                const moving_from = working_idx - lines[lines.length - 1].length
+                for (const format_range_list of [bold_ranges, italic_ranges, superscript_ranges, subscript_ranges]) {
+                    for (const range of format_range_list) {
+                        if (range[0] >= moving_from) {
+                            range[0] += 2
+                            range[1] += 2
+                        }
+                    }
                 }
             }
         }
@@ -561,20 +565,6 @@ function processContent(_canvas, content_obj) {
     }
 
     return fabric_text;
-}
-
-// Looks for the first item to be '\n' returns its index if it's a bullet, false otherwise
-function checkIfIsBullet(list, start_idx) {
-    for (let i = start_idx; i < list.length; i++) {
-        if (list[i].insert === "\n") {
-            if (list[i].attributes !== undefined && list[i].attributes.list == 'bullet') {
-                return i
-            }
-            else {
-                return false
-            }
-        }
-    }
 }
 
 export {
