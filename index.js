@@ -1,4 +1,5 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
+import { getCitationIndexes } from "./citations.js"
 
 const Parchment = Quill.import('parchment')
 
@@ -9,7 +10,6 @@ var currentSlide;
 var curr_slide_list_item;
 
 class QuillCitationBlot extends Parchment.Embed {
-
     static create(value) {
         let node = super.create();
         node.setAttribute('key', value.key);
@@ -31,15 +31,17 @@ QuillCitationBlot.tagName = "citation"
 Quill.register(QuillCitationBlot)
 
 class QuillCitationManager {
+    static VERSIONS = {
+        INSTAGRAM, FULL_TEXT
+    }
+
     constructor(quill, options) {
         this.quill = quill;
         this.options = options
-        // this.manager = options.manager
         quill.on('text-change', this.update.bind(this))
     }
 
     update(delta, prev, source) {
-        console.log(this.quill.getContents())
         if (source === "user") {
             if (delta.ops.some(e => e.insert === "@")) {
                 const retain_obj = delta.ops.find(e => e?.retain !== undefined)
@@ -55,6 +57,14 @@ class QuillCitationManager {
 
                         this.quill.enable(true)
                         this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
+
+                        // Should consider a better thing than this something like "global[this.var_name]"
+                        if(this.options.version !== QuillCitationManager.VERSIONS.FULL_TEXT){
+                            Slide.setContents(currentSlide, this.quill.getContent())
+                            Article.updateInstaCitations(currentArticle)
+                        } else {
+                            Article.updateFullTextCitations(currentArticle, this.quill.getContent())
+                        }
                     } else {
                         this.quill.enable(true)
                         this.quill.deleteText(idx_to_add, 1)
@@ -110,36 +120,106 @@ class QuillCitationManager {
     }
 }
 
-class CitationManager {
-    constructor() {
-        this.cite_order = new Array()
+class Article {
+    static create() {
+        return {
+            slides: [Slide.create()],
+            desc: "",
+            instagram_citations: {},
+            full_text: {},
+        }
     }
 
-    addParent() {
-        const new_id = Date.now()
-        this.cite_order.push({
-            id: new_id,
-            citations: new Array()
-        })
-        return new_id
+    static updateInstaCitations(art){
+        art.instagram_citations = getCitationIndexes(art.slides)
     }
 
-    updateCitations(parent_id, quill){
-        const new_citations = new Array()
-        for(const item of (quillSlide instanceof Quill) ? quill.getContents().ops : quill.ops){
-            if(item?.citation !== undefined && !new_citations.includes(item.citation.key)){
-                new_citations.push(item.citation.key)
+    static updateFullTextCitations(art, quill){
+        art.full_text = getCitationIndexes([{
+            content: quill
+        }])
+    }
+
+    // Add a slide Object and return it
+    static addSlide(art) {
+        const new_slide = Slide.create();
+        art.slides.push(new_slide)
+        Article.updateInstaCitations(art)
+        return new_slide
+    }
+
+    static moveSlideUp(art, slide) {
+        moveItemUpInArray(slide, art.slides)
+    }
+
+    static moveSlideDown(art, slide) {
+        moveItemDownInArray(slide, art.slides)
+        Article.updateInstaCitations(art)
+    }
+
+    static removeSlide(art, slide) {
+        const idx = art.slides.indexOf(slide)
+        if(idx > -1){
+            art.slides.splice(idx, 1);
+        }
+        removeItemFromArr(slide, art.slides)
+
+        Article.updateInstaCitations(art)
+        if (art.slides.length === 0) {
+            return Article.addSlide(art)
+        } else {
+            return art.slides[0]
+        }
+    }
+}
+
+class Slide {
+    static create() {
+        return {
+            title: "",
+            content: {},
+            img: {
+                src: "",
+                reverse_fit: false,
+                hide_blr_bk: false,
+                top: null,
+                width: null
             }
         }
-        this.cite_order.find(e => e.id === parent_id).citations = new_citations
     }
 
-    moveParentUp(id) {
-        moveItemUpInArray(this.cite_order.find(e => e.id === id), this.cite_order)
+    static saveProgress(slide) {
+        // The description content is handled by quill
+
+        slide.title = slide_title.value
+        slide.content = quillSlide.getContents()
+        if (slide.img.reverse_fit) {
+            slide.img.top = getPosition()
+            slide.img.width = getWidth()
+        } else {
+            slide.img.top = null
+            slide.img.width = null
+        }
     }
 
-    moveParentDown(id) {
-        moveItemDownInArray(this.cite_order.find(e => e.id === id), this.cite_order)
+    static getTitle(slide) {
+        return (slide.title === '') ? 'No Title' : slide.title
+    }
+
+    static getContent(slide) {
+        return slide.content
+    }
+
+    static setContents(slide, content) {
+        slide.content = content
+    }
+
+    static isReverseFit(slide) {
+        return slide.img.reverse_fit
+    }
+
+    static isHideBlurredBackground(slide) {
+        return slide.img.hide_blr_bk
     }
 }
 
@@ -153,7 +233,7 @@ const quillSlide = new Quill('#slide_content', {
             userOnly: true
         },
         citation: {
-
+            version: QuillCitationManager.VERSIONS.INSTAGRAM
         }
     },
     placeholder: 'Enter the contents of the slide',
@@ -210,6 +290,9 @@ const quillArticle = new Quill('#article-qill', {
         history: {
             maxStack: 250,
             userOnly: true
+        },
+        citation: {
+            version: QuillCitationManager.VERSIONS.FULL_TEXT
         }
     },
     placeholder: 'Write your full article here!',
@@ -236,9 +319,9 @@ const quillArticle = new Quill('#article-qill', {
 
 
 const makeBaseAndUpdate = () => {
-    saveProgressToObj()
-    // Only while debugging
-    updateImagePreview(currentSlide)
+    Slide.saveProgress(currentSlide)
+    Article.updateInstaCitations(currentArticle)
+    updateImagePreview(currentSlide. currentArticle.instagram_citations)
 }
 
 updateArticlesList()
@@ -271,6 +354,7 @@ quillArticle.on('text-change', (delta, oldContents, source) => {
     }
 })
 
+// Check the policy agreement
 {
     const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
     if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
@@ -302,6 +386,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 
     for (const art of mainData.articles) {
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
+        const citaitons = art.instagram_citations
 
         if (art?.article !== undefined) {
             quillArticle.setContents(art.article)
@@ -313,7 +398,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
             zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
-            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
+            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], citaitons), { base64: true, createFolders: true })
         }
     }
 
@@ -356,7 +441,6 @@ document.getElementById('import-btn').addEventListener('click', () => {
                     JSZip.loadAsync(file_loader.files[0])
                         .then((zip) => {
                             zip.file('collection.json').async("string").then(result => {
-                                // console.log(result)
                                 resolve(JSON.parse(result))
                             }).catch(reject)
                         })
@@ -394,7 +478,7 @@ document.getElementById('import-btn').addEventListener('click', () => {
 
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
-    saveProgressToObj()
+    Slide.saveProgress(currentSlide)
     for (const el of document.getElementsByClassName('instagram')) {
         el.classList.toggle('hidden')
     }
@@ -410,9 +494,9 @@ document.getElementById('insta-article-selector').addEventListener('click', (e) 
 // Title input
 document.getElementById('slide_title').addEventListener('input', (e) => {
     currentSlide.title = e.target.value;
-    curr_slide_list_item.innerHTML = getSlideTitle(currentSlide)
+    curr_slide_list_item.innerHTML = Slide.getTitle(currentSlide)
     if (currentSlide === currentArticle.slides[0]) {
-        document.querySelector("#articles_list > .selected").innerHTML = getSlideTitle(currentSlide)
+        document.querySelector("#articles_list > .selected").innerHTML = Slide.getTitle(currentSlide)
     }
     makeBaseAndUpdate()
 })
@@ -436,7 +520,26 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
 })
 
 document.getElementById('image-load-btn').addEventListener('click', e => {
-    askForImageAndAddToslide(currentSlide).then(updateImagePreview)
+    const file_loader = document.createElement('input')
+    file_loader.type = "file"
+    file_loader.accept = "image/*"
+    file_loader.addEventListener('input', (e) => {
+        try {
+            const reader = new FileReader()
+
+            reader.addEventListener("load", () => {
+                // convert image file to base64 string
+                currentSlide.img.src = reader.result;
+                updateImagePreview(currentSlide)
+            }, false);
+
+            reader.readAsDataURL(file_loader.files[0])
+        } catch (error) {
+            console.trace(error)
+        }
+    })
+
+    file_loader.click()
 })
 
 // Invert Image Checkbox
@@ -461,13 +564,22 @@ document.getElementById('hide-blurred-background-checkbox').addEventListener('ch
 
 // Remove Slide Button
 document.getElementById("rmv_btn").addEventListener('click', () => {
-    removeSlide()
+    currentSlide = Article.removeSlide(currentArticle, currentSlide)
+
+    updateSlidesList(currentSlide)
 })
 
 // Add Slide Button
 document.getElementById("nxt_btn").addEventListener('click', () => {
     if (currentArticle.slides.length < 10) {
-        makeNewSlide()
+        Slide.saveProgress(currentSlide)
+
+        currentSlide = Article.addSlide(currentArticle)
+
+        updateSlidesList(false);
+        if (AUTO_SAVE) {
+            saveToBrowser(false);
+        }
     }
 })
 
@@ -481,12 +593,20 @@ document.getElementById("remove_art").addEventListener('click', () => {
 
 // Move slide up Button
 document.getElementById('move_slide_up').addEventListener('click', () => {
-    moveSlideUp()
+    Slide.saveProgress(currentSlide)
+
+    Article.moveSlideUp(currentArticle, currentSlide)
+
+    updateSlidesList(false)
 })
 
 // Move slide Down Button
 document.getElementById('move_slide_down').addEventListener('click', () => {
-    moveSlideDown()
+    Slide.saveProgress(currentSlide)
+
+    Article.moveSlideDown(currentArticle, currentSlide)
+
+    updateSlidesList(false)
 })
 
 // Searching for citation ids
@@ -556,11 +676,11 @@ function updateArticlesList(update_current = true) {
         }
         for (let i = 0; i < mainData.articles.length; i++) {
             let new_it = document.createElement('li')
-            let new_it_text = document.createTextNode(getSlideTitle(mainData.articles[i].slides[0]))
+            let new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
             new_it.appendChild(new_it_text)
             new_it.value = i;
             new_it.addEventListener('click', (e) => {
-                saveProgressToObj()
+                Slide.saveProgress(currentSlide)
 
                 clearSelected(list)
                 e.target.classList.add('selected')
@@ -588,7 +708,7 @@ function updateArticlesList(update_current = true) {
 
         updateSlidesList(update_current);
     } else {
-        addArticle()
+        addArticle(true)
     }
 }
 
@@ -610,14 +730,14 @@ function updateSlidesList(update_current = true) {
         new_it.value = i + 1
         new_it.id = `slide_item_${i}`
         new_it.addEventListener('click', (e) => {
-            saveProgressToObj();
+            Slide.saveProgress(currentSlide);
 
             curr_slide_list_item.classList.remove('selected')
             e.target.classList.add('selected')
             currentSlide = slide
             curr_slide_list_item = e.target
 
-            updateSlide();
+            updateDOMSlide();
         })
 
         new_it.setAttribute("draggable", "true")
@@ -639,29 +759,27 @@ function updateSlidesList(update_current = true) {
         list.appendChild(new_it);
     }
 
-    updateSlide();
+    updateDOMSlide();
 }
 
-function updateSlide() {
+function updateDOMSlide() {
     document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
-    slide_title.value = currentSlide.title;
-    quillSlide.setContents(currentSlide.content);
+    slide_title.value = Slide.getTitle(currentSlide);
+    quillSlide.setContents(Slide.getContent(currentSlide));
     quillSlide.history.clear();
     updateImagePreview(currentSlide)
 }
 
-function addArticle(title) {
+function addArticle(update_current = false) {
     currentArticle.desc = quillDescription.getText()
 
-    currentSlide = createSlideObj();
-    currentSlide.title = (title === undefined) ? '' : title;
-    currentArticle = createArticleObj()
-    currentArticle.slides[0] = currentSlide
+    currentArticle = Article.create()
+    currentSlide = currentArticle.slides[0]
 
     mainData.articles.push(currentArticle)
-    updateArticlesList(false);
+    updateArticlesList(update_current);
 }
 
 function removeArticle() {
@@ -671,90 +789,11 @@ function removeArticle() {
     updateArticlesList(true)
 }
 
-function makeNewSlide() {
-    saveProgressToObj()
-
-    let new_slide = createSlideObj();
-    currentArticle.slides.push(new_slide)
-    currentSlide = new_slide
-
-    updateSlidesList(false);
-    if (AUTO_SAVE) {
-        saveToBrowser(false);
-    }
-}
-
-function removeSlide() {
-    removeItemFromArr(currentArticle.slides, currentSlide)
-    if (currentArticle.slides.length === 0) {
-        removeItemFromArr(mainData.articles, currentArticle)
-
-        // It already makes new Article if needed
-        updateArticlesList(true)
-    } else {
-        updateSlidesList(true)
-    }
-}
-
-function moveSlideUp() {
-    saveProgressToObj()
-
-    moveItemUpInArray(currentSlide, currentArticle.slides)
-
-    updateSlidesList(false)
-}
-
-function moveSlideDown() {
-    saveProgressToObj()
-
-    moveItemDownInArray(currentSlide, currentArticle.slides)
-
-    updateSlidesList(false)
-}
-
-// Returns a promise that will be resolved once the file has been updated (passing it the new slide)
-function askForImageAndAddToslide(slide) {
-    return new Promise((resolve, reject) => {
-        const file_loader = document.createElement('input')
-        file_loader.type = "file"
-        file_loader.accept = "image/*"
-        file_loader.addEventListener('input', (e) => {
-            try {
-                const reader = new FileReader()
-
-                reader.addEventListener("load", () => {
-                    // convert image file to base64 string
-                    slide.img.src = reader.result;
-                    resolve(slide)
-                }, false);
-
-                reader.readAsDataURL(file_loader.files[0])
-            } catch (error) {
-                reject(error)
-            }
-        })
-
-        file_loader.click()
-    })
-}
-
-function saveProgressToObj() {
-    // The description content is handled by quill
-
-    currentSlide.title = slide_title.value
-    currentSlide.content = quillSlide.getContents()
-    if (currentSlide.img.reverse_fit) {
-        currentSlide.img.top = getPosition()
-        currentSlide.img.width = getWidth()
-    } else {
-        currentSlide.img.top = null
-        currentSlide.img.width = null
-    }
-}
-
 function saveToBrowser(update_current = true) {
-    if (update_current)
-        saveProgressToObj()
+    if (update_current) {
+        Slide.saveProgress(currentSlide)
+        Article.updateInstaCitations(currentArticle)
+    }
     window.localStorage.setItem('data', JSON.stringify(mainData))
 }
 
@@ -762,7 +801,7 @@ function showLoading() {
     document.getElementById('loading-container').style.display = 'block'
 }
 
-function updateLoadingMessage(msg) {
+function updateLoadingMessage(msg = "") {
     document.querySelector("#loading-container > .loader-message").textContent = msg
 }
 
@@ -771,30 +810,27 @@ function hideLoading() {
     updateLoadingMessage("")
 }
 
-function createCollectionObj() {
-    return {
-        articles: [createArticleObj()]
-    }
-}
-
-function createArticleObj() {
-    return {
-        slides: [createSlideObj()],
-        desc: ""
-    }
-}
-
-function createSlideObj() {
-    return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null, width: null } }
-}
-
-function getSlideTitle(slide) {
-    return (slide.title === '') ? 'No Title' : slide.title
-}
-
 function clearChildren(el) {
     while (el.hasChildNodes()) {
         el.removeChild(el.firstChild);
+    }
+}
+
+function clearSelected(el) {
+    for (let i = 0; i < el.children.length; i++) {
+        el.children[i].classList.remove('selected')
+    }
+}
+
+// *************************************************************************************
+// *************************************************************************************
+// ********************************* NON-DOM FUNCTIONS *********************************
+// *************************************************************************************
+// *************************************************************************************
+
+function createCollectionObj() {
+    return {
+        articles: [Article.create()]
     }
 }
 
@@ -809,7 +845,7 @@ function removeItemFromArr(arr, item) {
     return false;
 }
 
-function moveItemUpInArray(item, array){
+function moveItemUpInArray(item, array) {
     const old_idx = array.indexOf(item)
     if (old_idx > 0) {
         [array[old_idx - 1], array[old_idx]] =
@@ -817,16 +853,10 @@ function moveItemUpInArray(item, array){
     }
 }
 
-function moveItemDownInArray(item, array){
+function moveItemDownInArray(item, array) {
     const old_idx = array.indexOf(item)
     if (old_idx < array.length - 1) {
         [array[old_idx], array[old_idx + 1]] =
             [array[old_idx + 1], array[old_idx]]
-    }
-}
-
-function clearSelected(el) {
-    for (let i = 0; i < el.children.length; i++) {
-        el.children[i].classList.remove('selected')
     }
 }
