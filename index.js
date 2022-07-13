@@ -30,10 +30,12 @@ QuillCitationBlot.blotName = "citation"
 QuillCitationBlot.tagName = "citation"
 Quill.register(QuillCitationBlot)
 
+
+const CitationManagerModes = {
+    FULL_TEXT: "FULL_TEXT", INSTAGRAM: "INSTAGRAM"
+}
+
 class QuillCitationManager {
-    static VERSIONS = {
-        INSTAGRAM, FULL_TEXT
-    }
 
     constructor(quill, options) {
         this.quill = quill;
@@ -59,11 +61,12 @@ class QuillCitationManager {
                         this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
 
                         // Should consider a better thing than this something like "global[this.var_name]"
-                        if(this.options.version !== QuillCitationManager.VERSIONS.FULL_TEXT){
-                            Slide.setContents(currentSlide, this.quill.getContent())
+                        if(this.options.version !== CitationManagerModes.FULL_TEXT){
+                            Slide.setContents(currentSlide, this.quill.getContents())
                             Article.updateInstaCitations(currentArticle)
+                            updateImagePreview(currentSlide, currentArticle.instagram_citations)
                         } else {
-                            Article.updateFullTextCitations(currentArticle, this.quill.getContent())
+                            Article.updateFullTextCitations(currentArticle, this.quill.getContents())
                         }
                     } else {
                         this.quill.enable(true)
@@ -233,7 +236,7 @@ const quillSlide = new Quill('#slide_content', {
             userOnly: true
         },
         citation: {
-            version: QuillCitationManager.VERSIONS.INSTAGRAM
+            version: CitationManagerModes.INSTAGRAM
         }
     },
     placeholder: 'Enter the contents of the slide',
@@ -292,7 +295,7 @@ const quillArticle = new Quill('#article-qill', {
             userOnly: true
         },
         citation: {
-            version: QuillCitationManager.VERSIONS.FULL_TEXT
+            version: CitationManagerModes.FULL_TEXT
         }
     },
     placeholder: 'Write your full article here!',
@@ -320,8 +323,8 @@ const quillArticle = new Quill('#article-qill', {
 
 const makeBaseAndUpdate = () => {
     Slide.saveProgress(currentSlide)
-    Article.updateInstaCitations(currentArticle)
-    updateImagePreview(currentSlide. currentArticle.instagram_citations)
+    // Article.updateInstaCitations(currentArticle)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
 
 updateArticlesList()
@@ -514,7 +517,7 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
     showLoading()
     dropHandler(e, currentSlide)
         .then(slide => {
-            updateImagePreview(slide).finally(hideLoading)
+            updateImagePreview(slide, currentArticle.instagram_citations).finally(hideLoading)
         })
         .finally(hideLoading)
 })
@@ -530,7 +533,7 @@ document.getElementById('image-load-btn').addEventListener('click', e => {
             reader.addEventListener("load", () => {
                 // convert image file to base64 string
                 currentSlide.img.src = reader.result;
-                updateImagePreview(currentSlide)
+                updateImagePreview(currentSlide, currentArticle.instagram_citations)
             }, false);
 
             reader.readAsDataURL(file_loader.files[0])
@@ -551,7 +554,7 @@ document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) =
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
-    updateImagePreview(currentSlide)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
     saveToBrowser(false);
 })
 
@@ -747,7 +750,7 @@ function updateSlidesList(update_current = true) {
         new_it.addEventListener('drop', e => {
             dropHandler(e, slide).then(updated_slide => {
                 if (updated_slide === currentSlide) {
-                    updateImagePreview(updated_slide)
+                    updateImagePreview(updated_slide, currentArticle.instagram_citations)
                 }
             })
         }, false)
@@ -769,7 +772,7 @@ function updateDOMSlide() {
     slide_title.value = Slide.getTitle(currentSlide);
     quillSlide.setContents(Slide.getContent(currentSlide));
     quillSlide.history.clear();
-    updateImagePreview(currentSlide)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
 
 function addArticle(update_current = false) {

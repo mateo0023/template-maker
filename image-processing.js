@@ -41,7 +41,7 @@ canvas.content_bounding_box;
 // This will update the image preview (no blur behind text)
 function updateImagePreview(slide_obj, cite_key_value = {}) {
     if (canvas?.prev_obj === undefined) {
-        return createImage(canvas, slide_obj)
+        return createImage(canvas, slide_obj, cite_key_value)
     } else if (canvas?.prev_obj !== slide_obj) {
         return new Promise((resolve, reject) => {
             try {
@@ -63,9 +63,13 @@ function updateImagePreview(slide_obj, cite_key_value = {}) {
 
                     if (_canvas.logo) {
                         _canvas.add(_canvas.logo)
+                        canvas.prevObj = structuredClone(slide_obj)
                         resolve(_canvas)
                     } else {
-                        addNewLogoToCanvas(_canvas).then(() => { res(_canvas) })
+                        addNewLogoToCanvas(_canvas).then(() => {
+                            canvas.prevObj = structuredClone(slide_obj)
+                            res(_canvas)
+                        })
                     }
                 };
 
@@ -89,7 +93,6 @@ function updateImagePreview(slide_obj, cite_key_value = {}) {
             } catch (error) {
                 reject(error)
             }
-            canvas.prevObj = structuredClone(slide_obj)
         })
     }
 }
@@ -489,7 +492,7 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
             const key = content_obj.ops[i].insert.citation.key
             temp_txt = (cite_key_value[key] !== undefined) ? `${cite_key_value[key]}` : `@${key}`
 
-            if(content_obj.ops[i]?.attributes?.script !== "super"){
+            if (content_obj.ops[i]?.attributes?.script !== "super") {
                 superscript_ranges.push([working_idx, working_idx + temp_txt.length])
             }
         } else {
@@ -555,7 +558,7 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
     }
 
     fabric_text.top = (IMAGE_HEIGHT - MARGIN * 1.5) * _canvas.SCALE - fabric_text.calcTextHeight();
-    
+
     return fabric_text;
 }
 
