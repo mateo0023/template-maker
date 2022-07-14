@@ -17,7 +17,8 @@
     <link rel="stylesheet" href="./fonts.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="./main.css" />
 
-    <script type="module" src="./lib/quill/quill.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="./lib/quill/quill.min.js"></script>
     <script src="./lib/fabric.min.js"></script>
     <script src="./lib/jszip.min.js"></script>
     <script src="./lib/FileSaver.min.js"></script>
@@ -26,11 +27,22 @@
 </head>
 
 <body>
+    <div id="citation-test">
+        <p>Find your Zotero User ID <a href="https://www.zotero.org/settings/keys" target="_blank" rel="noreferrer noopener">here</a>.</p>
+        <label for="zotero_user_id">User ID: </label>
+        <input type="text" name="zotero_user_id" value="" size="7" />
+        <p>Create your Zotero API Key <a href="https://www.zotero.org/settings/keys/new" target="_blank" rel="noreferrer noopener">here</a>. Remember to allow library read access.</p>
+        <label for="zotero_api_key">API Key: </label>
+        <input type="text" name="zotero_api_key" value="" size="24" />
+        <button>Update Zotero Credentials</button>
+    </div>
     <div class="header">
         <button id="save-progress">Save Progress</button>
         <button id="export-btn">Export Work</button>
         <button id="import-btn">Import Work</button>
+        <button id="zotero-btn">Zync Zotero</button>
     </div>
+    <div id="zotero-credentials"></div>
     <div class="global-container">
         <div id="lists_container">
             <div class="articles_list_container">
@@ -113,9 +125,6 @@
     <div id="citaitons-dropdown" class="hidden">
         <input type="text" placeholder="Search.." id="citation-search">
         <div id="sources-container">
-            <div>Test</div>
-            <div>Hello</div>
-            <div>About</div>
         </div>
     </div>
 

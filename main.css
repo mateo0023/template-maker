@@ -143,4 +143,17 @@ citation {
 #citaitons-dropdown {
     position: absolute;
     background-color: #ddd;
+    max-width: 400px;
+    max-height: 100%;
+}
+
+#sources-container {
+    scroll-behavior: smooth;
+    overflow-y: auto;
+}
+
+.citation-list-item {
+    border: 1px solid #f3f3f3c0;
+    max-height: 2.9em;
+    overflow: hidden;
 }
