@@ -1,10 +1,265 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
+import { getCitationIndexes, getBib, getCitationList, getWorksCitedText } from "./citations.js"
+
+const Parchment = Quill.import('parchment')
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
+updateZotero()
+
+class QuillCitationBlot extends Parchment.Embed {
+    static create(value) {
+        let node = super.create();
+        node.setAttribute('key', value.key);
+        node.setAttribute('contenteditable', false);
+        node.textContent = `@${value.key}`
+        // node.textContent = getString(node);
+        return node;
+    }
+
+    static value(node) {
+        return {
+            key: node.getAttribute('key')
+        }
+    }
+}
+QuillCitationBlot.blotName = "citation"
+QuillCitationBlot.tagName = "citation"
+Quill.register(QuillCitationBlot)
+
+
+const CitationManagerModes = {
+    FULL_TEXT: "FULL_TEXT", INSTAGRAM: "INSTAGRAM"
+}
+
+class QuillCitationManager {
+
+    constructor(quill, options) {
+        this.quill = quill;
+        this.options = options
+        quill.on('text-change', this.update.bind(this))
+    }
+
+    update(delta, prev, source) {
+        if (source === "user") {
+            if (delta.ops.some(e => e.insert === "@")) {
+                const retain_obj = delta.ops.find(e => e?.retain !== undefined)
+                const idx_to_add = (retain_obj === undefined) ? 0 : retain_obj.retain
+
+                this.quill.enable(false)
+                this.#getCitationId(idx_to_add + 1).then(res => {
+                    const citation_id = res
+                    if (citation_id !== undefined && citation_id !== "") {
+                        this.quill.deleteText(idx_to_add, 1)
+
+                        this.quill.insertEmbed(idx_to_add, 'citation', { idx: 0, key: citation_id }, 'api')
+
+                        this.quill.enable(true)
+                        this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
+
+                        // Should consider a better thing than this something like "global[this.var_name]"
+                        if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                            Slide.setContents(currentSlide, this.quill.getContents())
+                            Article.updateInstaCitations(currentArticle)
+                            updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                        } else {
+                            Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                        }
+                    } else {
+                        this.quill.enable(true)
+                        this.quill.deleteText(idx_to_add, 1)
+                    }
+                }).catch(err => {
+                    this.quill.deleteText(idx_to_add, 1)
+                    this.quill.enable(true)
+                })
+            } else if (delta.ops.some(e => e.delete !== undefined)) {
+                if (
+                    // Finds deleted blobs and then checks wether at least one is a citation object
+                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined).retain, delta.ops.find(e => e.delete !== undefined).delete)
+                        .some(e => e?.insert?.citation !== undefined)
+                ) {
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                        Article.updateInstaCitations(currentArticle)
+                        updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                    } else {
+                        Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                    }
+                }
+            }
+        }
+    }
+
+    #getCitationId(quill_idx) {
+        return new Promise((resolve, reject) => {
+            // First create the dropdown
+            const drop_container = document.getElementById('citaitons-dropdown')
+            const srcs_container = document.getElementById('sources-container')
+            const search_box = document.getElementById('citation-search')
+
+            const { left, top } = this.quill.container.getBoundingClientRect()
+            drop_container.style.left = `${left + this.quill.getBounds(quill_idx).left}px`
+            drop_container.style.top = `${top + this.quill.getBounds(quill_idx).top}px`
+
+            search_box.value = ""
+            search_box.onblur = (e) => {
+                if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
+                    drop_container.classList.add('hidden')
+                    reject('Clicked Away');
+                }
+            }
+
+            while (srcs_container.firstChild) {
+                srcs_container.removeChild(srcs_container.firstChild);
+            }
+
+            for (const pair of getCitationList(mainData.bib)) {
+                const item = document.createElement('div')
+                item.innerHTML = pair.div
+                item.classList.add('citation-list-item')
+
+                // Item should resolve the promise once clicked and hide everything
+                item.addEventListener('click', (e) => {
+                    drop_container.classList.add('hidden')
+                    resolve(pair.key)
+                })
+
+                srcs_container.appendChild(item)
+            }
+
+            drop_container.classList.remove('hidden')
+            search_box.focus()
+        })
+    }
+
+    static findDeletedBlobs(quill, retain, delete_length) {
+        const return_obj = new Array()
+        let working_idx = 0
+        let i = 0;
+        while (retain >= working_idx) {
+            return_obj[0] = quill.ops[i]
+            working_idx += (typeof quill.ops[i].insert === 'string') ? quill.ops[i].insert.length : 1
+            i++;
+        }
+        console.log(`w: ${working_idx}\tret: ${retain}\tdel: ${delete_length}`)
+
+        while (working_idx - retain < delete_length) {
+            return_obj.push(quill.ops[i])
+            working_idx += (typeof quill.ops[i].insert === 'string') ? quill.ops[i].insert.length : 1
+            i++;
+        }
+        return return_obj
+    }
+}
+
+class Article {
+    static create() {
+        return {
+            slides: [Slide.create()],
+            desc: "",
+            instagram_citations: {},
+            full_text: {},
+        }
+    }
+
+    static updateInstaCitations(art) {
+        art.instagram_citations = getCitationIndexes(art.slides)
+    }
+
+    static updateFullTextCitations(art, quill) {
+        art.full_text = getCitationIndexes([{
+            content: quill
+        }])
+    }
+
+    // Add a slide Object and return it
+    static addSlide(art) {
+        const new_slide = Slide.create();
+        art.slides.push(new_slide)
+        Article.updateInstaCitations(art)
+        return new_slide
+    }
+
+    static moveSlideUp(art, slide) {
+        moveItemUpInArray(slide, art.slides)
+    }
+
+    static moveSlideDown(art, slide) {
+        moveItemDownInArray(slide, art.slides)
+        Article.updateInstaCitations(art)
+    }
+
+    static removeSlide(art, slide) {
+        const idx = art.slides.indexOf(slide)
+        if (idx > -1) {
+            art.slides.splice(idx, 1);
+        }
+        removeItemFromArr(slide, art.slides)
+
+        Article.updateInstaCitations(art)
+        if (art.slides.length === 0) {
+            return Article.addSlide(art)
+        } else {
+            return art.slides[0]
+        }
+    }
+}
+
+class Slide {
+    static create() {
+        return {
+            title: "",
+            content: {},
+            img: {
+                src: "",
+                reverse_fit: false,
+                hide_blr_bk: false,
+                top: null,
+                width: null
+            }
+        }
+    }
+
+    static saveProgress(slide) {
+        // The description content is handled by quill
+
+        slide.title = slide_title.value
+        slide.content = quillSlide.getContents()
+        if (slide.img.reverse_fit) {
+            slide.img.top = getPosition()
+            slide.img.width = getWidth()
+        } else {
+            slide.img.top = null
+            slide.img.width = null
+        }
+    }
+
+    static getTitle(slide) {
+        return (slide.title === '') ? 'No Title' : slide.title
+    }
+
+    static getContent(slide) {
+        return slide.content
+    }
+
+    static setContents(slide, content) {
+        slide.content = content
+    }
+
+    static isReverseFit(slide) {
+        return slide.img.reverse_fit
+    }
+
+    static isHideBlurredBackground(slide) {
+        return slide.img.hide_blr_bk
+    }
+}
+
+Quill.register('modules/citation', QuillCitationManager)
 
 const quillSlide = new Quill('#slide_content', {
     modules: {
@@ -12,6 +267,9 @@ const quillSlide = new Quill('#slide_content', {
         history: {
             maxStack: 250,
             userOnly: true
+        },
+        citation: {
+            version: CitationManagerModes.INSTAGRAM
         }
     },
     placeholder: 'Enter the contents of the slide',
@@ -22,6 +280,8 @@ const quillSlide = new Quill('#slide_content', {
         'link',
         'script',
         'list',
+        'citation',
+        // 'citationEnd',
     ]
 });
 
@@ -38,6 +298,19 @@ const quillDescription = new Quill('#article-description', {
     formats: []
 });
 
+const quillSources = new Quill('#sources-intput', {
+    modules: {
+        toolbar: "",
+        history: {
+            maxStack: 250,
+            userOnly: true
+        }
+    },
+    placeholder: 'Article\'s Sources',
+    theme: 'snow',
+    formats: []
+})
+
 const quillArticle = new Quill('#article-qill', {
     modules: {
         toolbar: [
@@ -53,6 +326,9 @@ const quillArticle = new Quill('#article-qill', {
         history: {
             maxStack: 250,
             userOnly: true
+        },
+        citation: {
+            version: CitationManagerModes.FULL_TEXT
         }
     },
     placeholder: 'Write your full article here!',
@@ -79,9 +355,9 @@ const quillArticle = new Quill('#article-qill', {
 
 
 const makeBaseAndUpdate = () => {
-    saveProgressToObj()
-    // Only while debugging
-    updateImagePreview(currentSlide)
+    Slide.saveProgress(currentSlide)
+    // Article.updateInstaCitations(currentArticle)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
 
 updateArticlesList()
@@ -94,9 +370,16 @@ quillSlide.on('text-change', (delta, oldContents, source) => {
 })
 
 // When you change slide contents
-quillDescription.on('text-change', (delta, oldContents, source) => {
+quillDescription.on('text-change', (delta, old_contents, source) => {
     if (currentArticle && source === "user") {
         currentArticle.desc = quillDescription.getText();
+    }
+})
+
+quillSources.on('text-change', (delta, old_content, source) => {
+    if (currentArticle && source === "user") {
+        console.log(`Still Working adding this to bib: ${quillSources.getText()}`)
+        // currentArticle.bib = new Cite(quillSources.getText())
     }
 })
 
@@ -107,6 +390,7 @@ quillArticle.on('text-change', (delta, oldContents, source) => {
     }
 })
 
+// Check the policy agreement
 {
     const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
     if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
@@ -138,6 +422,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 
     for (const art of mainData.articles) {
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
+        const citaitons = art.instagram_citations
 
         if (art?.article !== undefined) {
             quillArticle.setContents(art.article)
@@ -146,10 +431,10 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
         }
 
         if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}\n\nResources:\n${getWorksCitedText(mainData.bib, citaitons)}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
-            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i]), { base64: true, createFolders: true })
+            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], citaitons), { base64: true, createFolders: true })
         }
     }
 
@@ -192,7 +477,6 @@ document.getElementById('import-btn').addEventListener('click', () => {
                     JSZip.loadAsync(file_loader.files[0])
                         .then((zip) => {
                             zip.file('collection.json').async("string").then(result => {
-                                // console.log(result)
                                 resolve(JSON.parse(result))
                             }).catch(reject)
                         })
@@ -219,7 +503,7 @@ document.getElementById('import-btn').addEventListener('click', () => {
 
     loading_promise
         .then(data => {
-            for(const article of data.articles) {
+            for (const article of data.articles) {
                 mainData.articles.push(article)
             }
             saveToBrowser(false)
@@ -228,9 +512,12 @@ document.getElementById('import-btn').addEventListener('click', () => {
         .catch(err => { console.log(err) })
 })
 
+document.getElementById('zotero-btn').addEventListener('click', () => {
+    updateZotero()
+})
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
-    saveProgressToObj()
+    Slide.saveProgress(currentSlide)
     for (const el of document.getElementsByClassName('instagram')) {
         el.classList.toggle('hidden')
     }
@@ -246,9 +533,9 @@ document.getElementById('insta-article-selector').addEventListener('click', (e) 
 // Title input
 document.getElementById('slide_title').addEventListener('input', (e) => {
     currentSlide.title = e.target.value;
-    curr_slide_list_item.innerHTML = getSlideTitle(currentSlide)
+    curr_slide_list_item.innerHTML = Slide.getTitle(currentSlide)
     if (currentSlide === currentArticle.slides[0]) {
-        document.querySelector("#articles_list > .selected").innerHTML = getSlideTitle(currentSlide)
+        document.querySelector("#articles_list > .selected").innerHTML = Slide.getTitle(currentSlide)
     }
     makeBaseAndUpdate()
 })
@@ -266,13 +553,32 @@ document.getElementById('canvas-container').addEventListener("drop", (e) => {
     showLoading()
     dropHandler(e, currentSlide)
         .then(slide => {
-            updateImagePreview(slide).finally(hideLoading)
+            updateImagePreview(slide, currentArticle.instagram_citations).finally(hideLoading)
         })
         .finally(hideLoading)
 })
 
 document.getElementById('image-load-btn').addEventListener('click', e => {
-    askForImageAndAddToslide(currentSlide).then(updateImagePreview)
+    const file_loader = document.createElement('input')
+    file_loader.type = "file"
+    file_loader.accept = "image/*"
+    file_loader.addEventListener('input', (e) => {
+        try {
+            const reader = new FileReader()
+
+            reader.addEventListener("load", () => {
+                // convert image file to base64 string
+                currentSlide.img.src = reader.result;
+                updateImagePreview(currentSlide, currentArticle.instagram_citations)
+            }, false);
+
+            reader.readAsDataURL(file_loader.files[0])
+        } catch (error) {
+            console.trace(error)
+        }
+    })
+
+    file_loader.click()
 })
 
 // Invert Image Checkbox
@@ -284,7 +590,7 @@ document.getElementById('inverse-fit-checkbox').addEventListener('change', (e) =
         currentSlide.img.top = null
         currentSlide.img.width = null
     }
-    updateImagePreview(currentSlide)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
     saveToBrowser(false);
 })
 
@@ -297,13 +603,22 @@ document.getElementById('hide-blurred-background-checkbox').addEventListener('ch
 
 // Remove Slide Button
 document.getElementById("rmv_btn").addEventListener('click', () => {
-    removeSlide()
+    currentSlide = Article.removeSlide(currentArticle, currentSlide)
+
+    updateSlidesList(currentSlide)
 })
 
 // Add Slide Button
 document.getElementById("nxt_btn").addEventListener('click', () => {
     if (currentArticle.slides.length < 10) {
-        makeNewSlide()
+        Slide.saveProgress(currentSlide)
+
+        currentSlide = Article.addSlide(currentArticle)
+
+        updateSlidesList(false);
+        if (AUTO_SAVE) {
+            saveToBrowser(false);
+        }
     }
 })
 
@@ -317,13 +632,50 @@ document.getElementById("remove_art").addEventListener('click', () => {
 
 // Move slide up Button
 document.getElementById('move_slide_up').addEventListener('click', () => {
-    moveSlideUp()
+    Slide.saveProgress(currentSlide)
+
+    Article.moveSlideUp(currentArticle, currentSlide)
+
+    updateSlidesList(false)
 })
 
 // Move slide Down Button
 document.getElementById('move_slide_down').addEventListener('click', () => {
-    moveSlideDown()
+    Slide.saveProgress(currentSlide)
+
+    Article.moveSlideDown(currentArticle, currentSlide)
+
+    updateSlidesList(false)
 })
+
+// Searching for citation ids
+document.getElementById('citation-search').addEventListener('input', e => {
+    const filter = e.target.value.toUpperCase();
+    const items = document.getElementById("sources-container").getElementsByTagName("div");
+    for (var i = 0; i < items.length; i++) {
+        var txtValue = items[i].textContent || items[i].innerText;
+        if (txtValue.toUpperCase().indexOf(filter) > -1) {
+            items[i].style.display = "";
+        } else {
+            items[i].style.display = "none";
+        }
+    }
+})
+
+function updateZotero(){
+    getBib(
+        window.localStorage.getItem('zotero-user-id'),
+        window.localStorage.getItem('zotero-api-key')
+    )
+        .then(items_list => {
+            mainData.bib = items_list
+        })
+        .catch((new_credentials) => {
+            window.localStorage.setItem('zotero-user-id', new_credentials.user_id)
+            window.localStorage.setItem('zotero-api-key', new_credentials.api_key)
+            updateZotero()
+        })
+}
 
 function draggoverHandler(e) {
     e.stopPropagation()
@@ -355,8 +707,8 @@ function dropHandler(e, slide = currentSlide) {
                 html_data.innerHTML = e.dataTransfer.getData('text/html')
                 if (url.searchParams.has('imgurl')) {
                     slide.img.src = url.searchParams.get('imgurl')
-                } else if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
-                    slide.img.src = html_data.getElementsByTagName('img')[0].src
+                    // } if (html_data.getElementsByTagName('img')[0]?.src !== undefined) {
+                    //     slide.img.src = html_data.getElementsByTagName('img')[0].src
                 } else {
                     slide.img.src = url.href
                 }
@@ -378,11 +730,11 @@ function updateArticlesList(update_current = true) {
         }
         for (let i = 0; i < mainData.articles.length; i++) {
             let new_it = document.createElement('li')
-            let new_it_text = document.createTextNode(getSlideTitle(mainData.articles[i].slides[0]))
+            let new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
             new_it.appendChild(new_it_text)
             new_it.value = i;
             new_it.addEventListener('click', (e) => {
-                saveProgressToObj()
+                Slide.saveProgress(currentSlide)
 
                 clearSelected(list)
                 e.target.classList.add('selected')
@@ -410,7 +762,7 @@ function updateArticlesList(update_current = true) {
 
         updateSlidesList(update_current);
     } else {
-        addArticle()
+        addArticle(true)
     }
 }
 
@@ -432,14 +784,14 @@ function updateSlidesList(update_current = true) {
         new_it.value = i + 1
         new_it.id = `slide_item_${i}`
         new_it.addEventListener('click', (e) => {
-            saveProgressToObj();
+            Slide.saveProgress(currentSlide);
 
             curr_slide_list_item.classList.remove('selected')
             e.target.classList.add('selected')
             currentSlide = slide
             curr_slide_list_item = e.target
 
-            updateSlide();
+            updateDOMSlide();
         })
 
         new_it.setAttribute("draggable", "true")
@@ -449,7 +801,7 @@ function updateSlidesList(update_current = true) {
         new_it.addEventListener('drop', e => {
             dropHandler(e, slide).then(updated_slide => {
                 if (updated_slide === currentSlide) {
-                    updateImagePreview(updated_slide)
+                    updateImagePreview(updated_slide, currentArticle.instagram_citations)
                 }
             })
         }, false)
@@ -461,29 +813,27 @@ function updateSlidesList(update_current = true) {
         list.appendChild(new_it);
     }
 
-    updateSlide();
+    updateDOMSlide();
 }
 
-function updateSlide() {
+function updateDOMSlide() {
     document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
-    slide_title.value = currentSlide.title;
-    quillSlide.setContents(currentSlide.content);
+    slide_title.value = Slide.getTitle(currentSlide);
+    quillSlide.setContents(Slide.getContent(currentSlide));
     quillSlide.history.clear();
-    updateImagePreview(currentSlide)
+    updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
 
-function addArticle(title) {
+function addArticle(update_current = false) {
     currentArticle.desc = quillDescription.getText()
 
-    currentSlide = createSlideObj();
-    currentSlide.title = (title === undefined) ? '' : title;
-    currentArticle = createArticleObj()
-    currentArticle.slides[0] = currentSlide
+    currentArticle = Article.create()
+    currentSlide = currentArticle.slides[0]
 
     mainData.articles.push(currentArticle)
-    updateArticlesList(false);
+    updateArticlesList(update_current);
 }
 
 function removeArticle() {
@@ -493,98 +843,11 @@ function removeArticle() {
     updateArticlesList(true)
 }
 
-function makeNewSlide() {
-    saveProgressToObj()
-
-    let new_slide = createSlideObj();
-    currentArticle.slides.push(new_slide)
-    currentSlide = new_slide
-
-    updateSlidesList(false);
-    if (AUTO_SAVE) {
-        saveToBrowser(false);
-    }
-}
-
-function removeSlide() {
-    removeItemFromArr(currentArticle.slides, currentSlide)
-    if (currentArticle.slides.length === 0) {
-        removeItemFromArr(mainData.articles, currentArticle)
-
-        // It already makes new Article if needed
-        updateArticlesList(true)
-    } else {
-        updateSlidesList(true)
-    }
-}
-
-function moveSlideUp() {
-    saveProgressToObj()
-
-    let old_idx = currentArticle.slides.indexOf(currentSlide)
-    if (old_idx > 0) {
-        [currentArticle.slides[old_idx - 1], currentArticle.slides[old_idx]] =
-            [currentArticle.slides[old_idx], currentArticle.slides[old_idx - 1]]
-    }
-
-    updateSlidesList(false)
-}
-
-function moveSlideDown() {
-    saveProgressToObj()
-
-    let old_idx = currentArticle.slides.indexOf(currentSlide)
-    if (old_idx < currentArticle.slides.length - 1) {
-        [currentArticle.slides[old_idx], currentArticle.slides[old_idx + 1]] =
-            [currentArticle.slides[old_idx + 1], currentArticle.slides[old_idx]]
-    }
-
-    updateSlidesList(false)
-}
-
-// Returns a promise that will be resolved once the file has been updated (passing it the new slide)
-function askForImageAndAddToslide(slide) {
-    return new Promise((resolve, reject) => {
-        const file_loader = document.createElement('input')
-        file_loader.type = "file"
-        file_loader.accept = "image/*"
-        file_loader.addEventListener('input', (e) => {
-            try {
-                const reader = new FileReader()
-
-                reader.addEventListener("load", () => {
-                    // convert image file to base64 string
-                    slide.img.src = reader.result;
-                    resolve(slide)
-                }, false);
-
-                reader.readAsDataURL(file_loader.files[0])
-            } catch (error) {
-                reject(error)
-            }
-        })
-
-        file_loader.click()
-    })
-}
-
-function saveProgressToObj() {
-    // The description content is handled by quill
-
-    currentSlide.title = slide_title.value
-    currentSlide.content = quillSlide.getContents()
-    if (currentSlide.img.reverse_fit) {
-        currentSlide.img.top = getPosition()
-        currentSlide.img.width = getWidth()
-    } else {
-        currentSlide.img.top = null
-        currentSlide.img.width = null
-    }
-}
-
 function saveToBrowser(update_current = true) {
-    if (update_current)
-        saveProgressToObj()
+    if (update_current) {
+        Slide.saveProgress(currentSlide)
+        Article.updateInstaCitations(currentArticle)
+    }
     window.localStorage.setItem('data', JSON.stringify(mainData))
 }
 
@@ -592,8 +855,8 @@ function showLoading() {
     document.getElementById('loading-container').style.display = 'block'
 }
 
-function updateLoadingMessage(msg) {
-    document.querySelector(".loader-container > .loader-message").textContent = msg
+function updateLoadingMessage(msg = "") {
+    document.querySelector("#loading-container > .loader-message").textContent = msg
 }
 
 function hideLoading() {
@@ -601,30 +864,27 @@ function hideLoading() {
     updateLoadingMessage("")
 }
 
-function createCollectionObj() {
-    return {
-        articles: [createArticleObj()]
-    }
-}
-
-function createArticleObj() {
-    return {
-        slides: [createSlideObj()],
-        desc: ""
-    }
-}
-
-function createSlideObj() {
-    return { title: "", content: {}, img: { src: "", reverse_fit: false, hide_blr_bk: false, top: null, width: null } }
-}
-
-function getSlideTitle(slide) {
-    return (slide.title === '') ? 'No Title' : slide.title
-}
-
 function clearChildren(el) {
     while (el.hasChildNodes()) {
         el.removeChild(el.firstChild);
+    }
+}
+
+function clearSelected(el) {
+    for (let i = 0; i < el.children.length; i++) {
+        el.children[i].classList.remove('selected')
+    }
+}
+
+// *************************************************************************************
+// *************************************************************************************
+// ********************************* NON-DOM FUNCTIONS *********************************
+// *************************************************************************************
+// *************************************************************************************
+
+function createCollectionObj() {
+    return {
+        articles: [Article.create()]
     }
 }
 
@@ -639,8 +899,18 @@ function removeItemFromArr(arr, item) {
     return false;
 }
 
-function clearSelected(el) {
-    for (let i = 0; i < el.children.length; i++) {
-        el.children[i].classList.remove('selected')
+function moveItemUpInArray(item, array) {
+    const old_idx = array.indexOf(item)
+    if (old_idx > 0) {
+        [array[old_idx - 1], array[old_idx]] =
+            [array[old_idx], array[old_idx - 1]]
+    }
+}
+
+function moveItemDownInArray(item, array) {
+    const old_idx = array.indexOf(item)
+    if (old_idx < array.length - 1) {
+        [array[old_idx], array[old_idx + 1]] =
+            [array[old_idx + 1], array[old_idx]]
     }
 }

@@ -39,9 +39,9 @@ canvas.title_bounding_box
 canvas.content_bounding_box;
 
 // This will update the image preview (no blur behind text)
-function updateImagePreview(slide_obj) {
+function updateImagePreview(slide_obj, cite_key_value = {}) {
     if (canvas?.prev_obj === undefined) {
-        return createImage(canvas, slide_obj)
+        return createImage(canvas, slide_obj, cite_key_value)
     } else if (canvas?.prev_obj !== slide_obj) {
         return new Promise((resolve, reject) => {
             try {
@@ -59,13 +59,17 @@ function updateImagePreview(slide_obj) {
                     if (_canvas.bkImageFabricGroup !== undefined) {
                         _canvas.add(_canvas.bkImageFabricGroup)
                     }
-                    addTextToCanvas(_canvas, slide_obj)
+                    addTextToCanvas(_canvas, slide_obj, cite_key_value)
 
                     if (_canvas.logo) {
                         _canvas.add(_canvas.logo)
+                        canvas.prevObj = structuredClone(slide_obj)
                         resolve(_canvas)
                     } else {
-                        addNewLogoToCanvas(_canvas).then(() => { res(_canvas) })
+                        addNewLogoToCanvas(_canvas).then(() => {
+                            canvas.prevObj = structuredClone(slide_obj)
+                            res(_canvas)
+                        })
                     }
                 };
 
@@ -89,12 +93,11 @@ function updateImagePreview(slide_obj) {
             } catch (error) {
                 reject(error)
             }
-            canvas.prevObj = structuredClone(slide_obj)
         })
     }
 }
 
-function createImage(_canvas, slide_obj) {
+function createImage(_canvas, slide_obj, cite_key_value = {}) {
     return new Promise((resolve, reject) => {
         try {
             // This will be done last, it is where the promise will be resolved
@@ -111,7 +114,7 @@ function createImage(_canvas, slide_obj) {
                 if (_canvas.bkImageFabricGroup !== undefined) {
                     _canvas.add(_canvas.bkImageFabricGroup)
                 }
-                addTextToCanvas(_canvas, slide_obj)
+                addTextToCanvas(_canvas, slide_obj, cite_key_value)
 
                 if (_canvas.logo) {
                     _canvas.add(_canvas.logo)
@@ -139,9 +142,9 @@ function createImage(_canvas, slide_obj) {
 
 }
 
-function exportSlideToJpegData(slide_obj) {
+function exportSlideToJpegData(slide_obj, cite_key_value = {}) {
     var _canvas = createGhostCanvas()
-    return createImage(_canvas, slide_obj).then(result => {
+    return createImage(_canvas, slide_obj, cite_key_value).then(result => {
         return _canvas.toDataURL({
             format: 'jpeg',
             multiplier: 1 / _canvas.SCALE
@@ -203,7 +206,7 @@ function addNewLogoToCanvas(_canvas) {
 }
 
 // Will process all text and textboxes and add them to the Canvas
-function addTextToCanvas(_canvas = canvas, slide_obj) {
+function addTextToCanvas(_canvas = canvas, slide_obj, cite_key_value = {}) {
 
     if (_canvas.title_bounding_box !== null && _canvas.title_bounding_box !== undefined) {
         _canvas.remove(_canvas.title_bounding_box);
@@ -219,7 +222,7 @@ function addTextToCanvas(_canvas = canvas, slide_obj) {
     }
 
     _canvas.title_txt_box = fabricMakeTitleText(_canvas, slide_obj.title)
-    _canvas.content_txt_box = processContent(_canvas, slide_obj.content)
+    _canvas.content_txt_box = processContent(_canvas, slide_obj.content, cite_key_value)
     if (_canvas.title_txt_box === null) {
         _canvas.title_bounding_box = null
     } else {
@@ -458,37 +461,13 @@ function fabricMakeTitleText(_canvas, text) {
     })
 }
 
-function fabricMakeContentText(_canvas, text) {
-    if (text === undefined || text === null || text === '') {
-        return null
-    }
-    text = text.replace(/\n*$/, '')
-
-    const txt_box = new fabric.Textbox(text, {
-        left: MARGIN * 1.5 * _canvas.SCALE,
-        fill: 'white',
-        fontFamily: "Celebes",
-        textAlign: 'left',
-        // Color, horizontal offset, vertical offest, blur radius
-        shadow: `rgba(0,0,0,0.6) ${0.92705 * _canvas.SCALE}px ${2.853 * _canvas.SCALE}px ${5 * _canvas.SCALE}px`,
-        width: (MAX_RECT_WIDTH - MARGIN) * _canvas.SCALE,
-        fontSize: 50 * _canvas.SCALE,
-        lineHeight: 1,
-        selectable: false
-    })
-
-    txt_box.top = (IMAGE_HEIGHT - MARGIN * 1.5) * _canvas.SCALE - txt_box.calcTextHeight();
-    return txt_box
-}
-
-
 // ***********************************************************************
 // ***********************************************************************
 // ********************** Text Processing Functions **********************
 // ***********************************************************************
 // ***********************************************************************
 
-function processContent(_canvas, content_obj) {
+function processContent(_canvas, content_obj, cite_key_value = {}) {
     let text = ""
     const bold_ranges = new Array()
     const italic_ranges = new Array()
@@ -498,7 +477,26 @@ function processContent(_canvas, content_obj) {
     let working_idx = 0;
     for (let i = 0; i < content_obj?.ops?.length; i++) {
         let temp_txt;
-        temp_txt = content_obj.ops[i].insert
+        let new_bullet_idx = checkIfIsBullet(content_obj.ops, i)
+
+        if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
+            prev_bullet_idx = new_bullet_idx
+
+            // Make sure that to add the bullet to the last line of the text item
+            const lines = content_obj.ops[i].insert.split('\n')
+            lines[lines.length - 1] = "• " + lines[lines.length - 1]
+
+            temp_txt = lines.join('\n')
+        } else if (content_obj.ops[i].insert?.citation !== undefined) {
+            const key = content_obj.ops[i].insert.citation.key
+            temp_txt = (cite_key_value[key] !== undefined) ? `${cite_key_value[key]}` : `@${key}`
+
+            if (content_obj.ops[i]?.attributes?.script !== "super") {
+                superscript_ranges.push([working_idx, working_idx + temp_txt.length])
+            }
+        } else {
+            temp_txt = content_obj.ops[i].insert
+        }
 
         if (content_obj.ops[i].attributes !== undefined) {
             if (content_obj.ops[i].attributes.bold) {
@@ -547,7 +545,18 @@ function processContent(_canvas, content_obj) {
         return null
     }
 
-    const fabric_text = fabricMakeContentText(_canvas, text)
+    const fabric_text = new fabric.Textbox(text, {
+        left: MARGIN * 1.5 * _canvas.SCALE,
+        fill: 'white',
+        fontFamily: "Celebes",
+        textAlign: 'left',
+        // Color, horizontal offset, vertical offest, blur radius
+        shadow: `rgba(0,0,0,0.6) ${0.92705 * _canvas.SCALE}px ${2.853 * _canvas.SCALE}px ${5 * _canvas.SCALE}px`,
+        width: (MAX_RECT_WIDTH - MARGIN) * _canvas.SCALE,
+        fontSize: 50 * _canvas.SCALE,
+        lineHeight: 1,
+        selectable: false
+    })
 
     for (var i = 0; i < bold_ranges.length; i++) {
         fabric_text.setSelectionStyles({
@@ -565,6 +574,8 @@ function processContent(_canvas, content_obj) {
     for (var i = 0; i < subscript_ranges.length; i++) {
         fabric_text.setSubscript(subscript_ranges[i][0], Math.min(subscript_ranges[i][1]), text.length - 1)
     }
+
+    fabric_text.top = (IMAGE_HEIGHT - MARGIN * 1.5) * _canvas.SCALE - fabric_text.calcTextHeight();
 
     return fabric_text;
 }

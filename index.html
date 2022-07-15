@@ -17,7 +17,8 @@
     <link rel="stylesheet" href="./fonts.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="./main.css" />
 
-    <script type="module" src="./lib/quill/quill.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="./lib/quill/quill.min.js"></script>
     <script src="./lib/fabric.min.js"></script>
     <script src="./lib/jszip.min.js"></script>
     <script src="./lib/FileSaver.min.js"></script>
@@ -30,7 +31,9 @@
         <button id="save-progress">Save Progress</button>
         <button id="export-btn">Export Work</button>
         <button id="import-btn">Import Work</button>
+        <button id="zotero-btn">Zync Zotero</button>
     </div>
+    <div id="zotero-credentials"></div>
     <div class="global-container">
         <div id="lists_container">
             <div class="articles_list_container">
@@ -47,7 +50,8 @@
             </div>
             <div class="instagram">
                 <div id="article-description" class="my-qill"></div>
-                <div></div>
+                <h4>Sources</h4>
+                <div id="sources-intput" class="my-quill"></div>
             </div>
             <div class="slides_list_container instagram">
                 <h1>Slides</h1>
@@ -105,6 +109,13 @@
                 <canvas src="" id="output-img" alt="" width="360px" height="450px">
                 </canvas>
             </div>
+        </div>
+    </div>
+
+
+    <div id="citaitons-dropdown" class="hidden">
+        <input type="text" placeholder="Search..." id="citation-search">
+        <div id="sources-container">
         </div>
     </div>
 
