@@ -1,5 +1,5 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-import { getCitationIndexes, getBib, getCitationList, getWorksCitedText } from "./citations.js"
+import { getCitationIndexes } from "./citations.js"
 
 const Parchment = Quill.import('parchment')
 
@@ -8,7 +8,6 @@ const mainData = (window.localStorage.getItem('data') === null) ? createCollecti
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
-updateZotero()
 
 class QuillCitationBlot extends Parchment.Embed {
     static create(value) {
@@ -61,7 +60,7 @@ class QuillCitationManager {
                         this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
 
                         // Should consider a better thing than this something like "global[this.var_name]"
-                        if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        if(this.options.version !== CitationManagerModes.FULL_TEXT){
                             Slide.setContents(currentSlide, this.quill.getContents())
                             Article.updateInstaCitations(currentArticle)
                             updateImagePreview(currentSlide, currentArticle.instagram_citations)
@@ -100,6 +99,7 @@ class QuillCitationManager {
             const drop_container = document.getElementById('citaitons-dropdown')
             const srcs_container = document.getElementById('sources-container')
             const search_box = document.getElementById('citation-search')
+            drop_container.classList.remove('hidden')
 
             const { left, top } = this.quill.container.getBoundingClientRect()
             drop_container.style.left = `${left + this.quill.getBounds(quill_idx).left}px`
@@ -122,21 +122,20 @@ class QuillCitationManager {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-            for (const pair of getCitationList(mainData.bib)) {
+            for (const id of ['aguera-arcasLargeLanguageModels2022', 'antonySecretaryBlinkenRemarks2021', 'thoppilanLaMDALanguageModels2022']) {
                 const item = document.createElement('div')
-                item.innerHTML = pair.div
+                item.innerHTML = id
                 item.classList.add('citation-list-item')
 
                 // Item should resolve the promise once clicked and hide everything
                 item.addEventListener('click', (e) => {
                     drop_container.classList.add('hidden')
-                    resolve(pair.key)
+                    resolve(id)
                 })
 
                 srcs_container.appendChild(item)
             }
 
-            drop_container.classList.remove('hidden')
             search_box.focus()
         })
     }
@@ -170,11 +169,11 @@ class Article {
         }
     }
 
-    static updateInstaCitations(art) {
+    static updateInstaCitations(art){
         art.instagram_citations = getCitationIndexes(art.slides)
     }
 
-    static updateFullTextCitations(art, quill) {
+    static updateFullTextCitations(art, quill){
         art.full_text = getCitationIndexes([{
             content: quill
         }])
@@ -199,7 +198,7 @@ class Article {
 
     static removeSlide(art, slide) {
         const idx = art.slides.indexOf(slide)
-        if (idx > -1) {
+        if(idx > -1){
             art.slides.splice(idx, 1);
         }
         removeItemFromArr(slide, art.slides)
@@ -435,7 +434,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
         }
 
         if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}\n\nResources:\n${getWorksCitedText(mainData.bib, citaitons)}`, { binary: false })
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
             zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], citaitons), { base64: true, createFolders: true })
@@ -516,9 +515,6 @@ document.getElementById('import-btn').addEventListener('click', () => {
         .catch(err => { console.log(err) })
 })
 
-document.getElementById('zotero-btn').addEventListener('click', () => {
-    updateZotero()
-})
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
     Slide.saveProgress(currentSlide)
