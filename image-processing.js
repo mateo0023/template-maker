@@ -477,17 +477,8 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
     let working_idx = 0;
     for (let i = 0; i < content_obj?.ops?.length; i++) {
         let temp_txt;
-        let new_bullet_idx = checkIfIsBullet(content_obj.ops, i)
-
-        if (new_bullet_idx !== false && new_bullet_idx > prev_bullet_idx) {
-            prev_bullet_idx = new_bullet_idx
-
-            // Make sure that to add the bullet to the last line of the text item
-            const lines = content_obj.ops[i].insert.split('\n')
-            lines[lines.length - 1] = "• " + lines[lines.length - 1]
-
-            temp_txt = lines.join('\n')
-        } else if (content_obj.ops[i].insert?.citation !== undefined) {
+        
+        if (content_obj.ops[i].insert?.citation !== undefined) {
             const key = content_obj.ops[i].insert.citation.key
             temp_txt = (cite_key_value[key] !== undefined) ? `${cite_key_value[key]}` : `@${key}`
 

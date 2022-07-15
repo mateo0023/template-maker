@@ -4,9 +4,6 @@
 // **************************************************
 // **************************************************
 
-const user_id = "9351589"
-const client_key = "m1EOX4r47v8pHTAMm1j6Mnm2"
-
 // Promise resolves with bibliography or rejects with new credentials
 function getBib(user_id, api_key) {
     return new Promise((resolve, reject) => {

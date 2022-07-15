@@ -107,10 +107,15 @@ class QuillCitationManager {
 
             search_box.value = ""
             search_box.onblur = (e) => {
-                if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
-                    drop_container.classList.add('hidden')
-                    reject('Clicked Away');
-                }
+                // Fix for fire order in Chome
+                setTimeout(
+                    () => {
+                        if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
+                            drop_container.classList.add('hidden')
+                            reject('Clicked Away');
+                        }
+                    }, 200
+                )
             }
 
             while (srcs_container.firstChild) {
@@ -145,7 +150,6 @@ class QuillCitationManager {
             working_idx += (typeof quill.ops[i].insert === 'string') ? quill.ops[i].insert.length : 1
             i++;
         }
-        console.log(`w: ${working_idx}\tret: ${retain}\tdel: ${delete_length}`)
 
         while (working_idx - retain < delete_length) {
             return_obj.push(quill.ops[i])
