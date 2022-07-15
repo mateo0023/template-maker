@@ -10,33 +10,41 @@ const client_key = "m1EOX4r47v8pHTAMm1j6Mnm2"
 // Promise resolves with bibliography or rejects with new credentials
 function getBib(user_id, api_key) {
     return new Promise((resolve, reject) => {
-        axios.get(`https://api.zotero.org/users/${user_id}/items`, {
-            headers: {
-                'Zotero-API-Key': api_key
-            },
-            params: {
-                format: 'json',
-                include: 'data,bib',
-                style: 'ieee'
-            }
-        })
-            .then(r => {
-                resolve(r.data)
-            })
-            .catch(e => {
-                let hint;
-                if(e?.response.status === 500){
-                    hint = 'Your User ID may be incorrect'
-                } else {
-                    hint = e?.response.data
-                }
-                getCredentials(
-                    user_id,
-                    api_key,
-                    hint
-                )
+        if (user_id == null || api_key == null) {
+            getCredentials(
+                user_id,
+                api_key
+            )
                 .then(reject)
+        } else {
+            axios.get(`https://api.zotero.org/users/${user_id}/items`, {
+                headers: {
+                    'Zotero-API-Key': api_key
+                },
+                params: {
+                    format: 'json',
+                    include: 'data,bib',
+                    style: 'ieee'
+                }
             })
+                .then(r => {
+                    resolve(r.data)
+                })
+                .catch(e => {
+                    let hint;
+                    if (e?.response.status === 500) {
+                        hint = 'Your User ID may be incorrect'
+                    } else {
+                        hint = e?.response.data
+                    }
+                    getCredentials(
+                        user_id,
+                        api_key,
+                        hint
+                    )
+                        .then(reject)
+                })
+        }
     })
 }
 
@@ -49,7 +57,7 @@ function getCredentials(user_id, api_key, hint) {
             zotero_loader_cont.removeChild(zotero_loader_cont.firstChild);
         }
 
-        if(typeof hint === 'string'){
+        if (typeof hint === 'string') {
             zotero_loader_cont.innerHTML = `<div><b>Hint: </b>${hint}`
         }
 
