@@ -40,7 +40,6 @@ class QuillCitationBlot extends Parchment.Embed {
     static create(value) {
         let node = super.create();
         node.setAttribute('key', value.key);
-        node.setAttribute('citation_manager', value.manager)
         node.setAttribute('contenteditable', false);
         node.textContent = `@${value.key}`
         // node.textContent = getString(node);
@@ -103,6 +102,20 @@ class QuillCitationManager {
                     this.quill.deleteText(idx_to_add, 1)
                     this.quill.enable(true)
                 })
+            } else if (delta.ops.some(e => e.delete !== undefined)) {
+                if (
+                    // Finds deleted blobs and then checks wether at least one is a citation object
+                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined).retain, delta.ops.find(e => e.delete !== undefined).delete)
+                        .some(e => e?.insert?.citation !== undefined)
+                ) {
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                        Article.updateInstaCitations(currentArticle)
+                        updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                    } else {
+                        Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                    }
+                }
             }
         }
     }
@@ -147,6 +160,25 @@ class QuillCitationManager {
             drop_container.classList.remove('hidden')
             search_box.focus()
         })
+    }
+
+    static findDeletedBlobs(quill, retain, delete_length) {
+        const return_obj = new Array()
+        let working_idx = 0
+        let i = 0;
+        while (retain >= working_idx) {
+            return_obj[0] = quill.ops[i]
+            working_idx += (typeof quill.ops[i].insert === 'string') ? quill.ops[i].insert.length : 1
+            i++;
+        }
+        console.log(`w: ${working_idx}\tret: ${retain}\tdel: ${delete_length}`)
+
+        while (working_idx - retain < delete_length) {
+            return_obj.push(quill.ops[i])
+            working_idx += (typeof quill.ops[i].insert === 'string') ? quill.ops[i].insert.length : 1
+            i++;
+        }
+        return return_obj
     }
 }
 
