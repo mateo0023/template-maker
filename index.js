@@ -1,5 +1,5 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-import { getCitationIndexes, getBib, getCitationList, getWorksCitedText, getCredentials } from "./citations.js"
+import { getCitationIndexes, getBib, getCitationList, getWorksCitedText } from "./citations.js"
 
 const Parchment = Quill.import('parchment')
 
@@ -539,21 +539,7 @@ document.getElementById('import-btn').addEventListener('click', () => {
 })
 
 document.getElementById('zotero-btn').addEventListener('click', () => {
-
-    getBib()
-        .then(items_list => {
-            mainData.bib = items_list
-        })
-        .catch((e) => {
-            getCredentials().then(credentials => {
-                console.log(credentials)
-            })
-        })
-    const zotero_user = window.localStorage.getItem('zotero_user')
-    const zotero_key = window.localStorage.getItem('zotero_key')
-    if (zotero_user === '' || zotero_key === '') {
-        // Should open the input to load the Zotero User and API Keys
-    }
+    updateZotero()
 })
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
@@ -701,6 +687,21 @@ document.getElementById('citation-search').addEventListener('input', e => {
         }
     }
 })
+
+function updateZotero(){
+    getBib(
+        window.localStorage.getItem('zotero-user-id'),
+        window.localStorage.getItem('zotero-api-key')
+    )
+        .then(items_list => {
+            mainData.bib = items_list
+        })
+        .catch((new_credentials) => {
+            window.localStorage.setItem('zotero-user-id', new_credentials.user_id)
+            window.localStorage.setItem('zotero-api-key', new_credentials.api_key)
+            updateZotero()
+        })
+}
 
 function draggoverHandler(e) {
     e.stopPropagation()
