@@ -474,7 +474,6 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
     const superscript_ranges = new Array()
     const subscript_ranges = new Array()
 
-    let prev_bullet_idx = 0;
     let working_idx = 0;
     for (let i = 0; i < content_obj?.ops?.length; i++) {
         let temp_txt;
@@ -512,6 +511,25 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
                 } else if (content_obj.ops[i].attributes.script === "sub") {
                     subscript_ranges.push([working_idx, working_idx + temp_txt.length])
                 }
+            }
+            if (content_obj.ops[i].attributes.list == 'bullet') {
+                // Add the bullet
+                const lines = text.split('\n')
+                const moving_from = working_idx - lines[lines.length - 1].length
+                
+                lines[lines.length - 1] = "• " + lines[lines.length - 1]
+                text = lines.join('\n')
+                
+                // Update the shifted ranges shifted by adding "• "
+                for (const format_range_list of [bold_ranges, italic_ranges, superscript_ranges, subscript_ranges]) {
+                    for (const range of format_range_list) {
+                        if (range[0] >= moving_from) {
+                            range[0] += 2
+                            range[1] += 2
+                        }
+                    }
+                }
+                working_idx += 2
             }
         }
 
@@ -560,20 +578,6 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
     fabric_text.top = (IMAGE_HEIGHT - MARGIN * 1.5) * _canvas.SCALE - fabric_text.calcTextHeight();
 
     return fabric_text;
-}
-
-// Looks for the first item to be '\n' returns its index if it's a bullet, false otherwise
-function checkIfIsBullet(list, start_idx) {
-    for (let i = start_idx; i < list.length; i++) {
-        if (list[i].insert === "\n") {
-            if (list[i].attributes !== undefined && list[i].attributes.list == 'bullet') {
-                return i
-            }
-            else {
-                return false
-            }
-        }
-    }
 }
 
 export {
