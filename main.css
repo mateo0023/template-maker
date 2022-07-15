@@ -33,11 +33,6 @@ body {
     /* for Chrome, Safari, and Opera */
 }
 
-citation {
-    background-color: #ddd;
-    text-decoration: underline;
-}
-
 #slide_content {
     height: 325px;
 }

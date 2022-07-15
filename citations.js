@@ -135,8 +135,11 @@ function getCitationIndexes(slide_list) {
     let total_idx = 0;
     for (const slide of slide_list) {
         for (const item of slide.content.ops) {
-            if (item.insert?.citation !== undefined && citation_order?.[item.insert.citation.key] === undefined) {
-                citation_order[item.insert.citation.key] = ++total_idx;
+            if (item.insert?.citation !== undefined) {
+                if (citation_order?.[item.insert.citation.key] === undefined) {
+                    citation_order[item.insert.citation.key] = ++total_idx;
+                }
+                item.insert.citation.index = `${citation_order[item.insert.citation.key]}`
             }
         }
     }

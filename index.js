@@ -1,7 +1,7 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
 import { getCitationIndexes, getBib, getCitationList, getWorksCitedText } from "./citations.js"
 
-const Parchment = Quill.import('parchment')
+// const Parchment = Quill.import('parchment')
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
@@ -10,24 +10,44 @@ var currentSlide;
 var curr_slide_list_item;
 updateZotero()
 
-class QuillCitationBlot extends Parchment.Embed {
+class QuillCitationBlot extends Quill.import('blots/embed') {
+    static blotName = 'citation'
+    static tagName = 'citation'
+
     static create(value) {
-        let node = super.create();
+        const node = super.create();
         node.setAttribute('key', value.key);
-        node.setAttribute('contenteditable', false);
-        node.textContent = `@${value.key}`
-        // node.textContent = getString(node);
+        node.setAttribute('index', value?.index);
+        if (value.index === 'undefined' || value.index === undefined) {
+            node.textContent = `@${value.key}`
+            node.style = "background-color: #ddd; text-decoration: underline;"
+        } else {
+            const sup = document.createElement('sup')
+            const link = document.createElement('a')
+            link.href = `#${value.key}`
+            link.textContent = value.index
+            sup.appendChild(link)
+            node.appendChild(sup)
+        }
         return node;
     }
 
     static value(node) {
         return {
-            key: node.getAttribute('key')
+            key: node.getAttribute('key'),
+            index: node.getAttribute('index')
         }
     }
+
+    // All blank so that they cannot be formatted
+    static formats(domNode) {}
+
+    // Apply format to blot. Should not pass onto child or other blot.
+    format(format, value) {}
+
+    // Return formats represented by blot, including from Attributors.
+    formats() { return {} }
 }
-QuillCitationBlot.blotName = "citation"
-QuillCitationBlot.tagName = "citation"
 Quill.register(QuillCitationBlot)
 
 
@@ -55,19 +75,30 @@ class QuillCitationManager {
                     if (citation_id !== undefined && citation_id !== "") {
                         this.quill.deleteText(idx_to_add, 1)
 
-                        this.quill.insertEmbed(idx_to_add, 'citation', { idx: 0, key: citation_id }, 'api')
-
-                        this.quill.enable(true)
-                        this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
-
                         // Should consider a better thing than this something like "global[this.var_name]"
                         if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                            this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_id], key: citation_id }, 'api')
+
                             Slide.setContents(currentSlide, this.quill.getContents())
                             Article.updateInstaCitations(currentArticle)
                             updateImagePreview(currentSlide, currentArticle.instagram_citations)
+
+                            this.quill.setContents(currentSlide.content, 'api')
                         } else {
+                            const sould_re_update = idx_to_add === this.quill.getLength()
+
+                            this.quill.insertEmbed(idx_to_add, 'citation', { key: citation_id, index: currentArticle.full_text_citations?.[citation_id] }, 'api')
+
+                            Article.setFullLength(currentArticle, this.quill.getContents())
                             Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+
+                            if (sould_re_update)
+                                this.quill.setContents(currentArticle.full_text)
                         }
+
+
+                        this.quill.enable(true)
+                        this.quill.setSelection(idx_to_add + 2, Quill.sources.API);
                     } else {
                         this.quill.enable(true)
                         this.quill.deleteText(idx_to_add, 1)
@@ -79,7 +110,7 @@ class QuillCitationManager {
             } else if (delta.ops.some(e => e.delete !== undefined)) {
                 if (
                     // Finds deleted blobs and then checks wether at least one is a citation object
-                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined).retain, delta.ops.find(e => e.delete !== undefined).delete)
+                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined)?.retain, delta.ops.find(e => e.delete !== undefined).delete)
                         .some(e => e?.insert?.citation !== undefined)
                 ) {
                     if (this.options.version !== CitationManagerModes.FULL_TEXT) {
@@ -142,6 +173,7 @@ class QuillCitationManager {
     }
 
     static findDeletedBlobs(quill, retain, delete_length) {
+        if (retain === undefined) retain = 0;
         const return_obj = new Array()
         let working_idx = 0
         let i = 0;
@@ -167,6 +199,7 @@ class Article {
             desc: "",
             instagram_citations: {},
             full_text: {},
+            full_text_citations: {},
         }
     }
 
@@ -175,9 +208,13 @@ class Article {
     }
 
     static updateFullTextCitations(art, quill) {
-        art.full_text = getCitationIndexes([{
+        art.full_text_citations = getCitationIndexes([{
             content: quill
         }])
+    }
+
+    static setFullLength(art, quill) {
+        art.full_text = quill
     }
 
     // Add a slide Object and return it
@@ -666,7 +703,7 @@ document.getElementById('citation-search').addEventListener('input', e => {
     }
 })
 
-function updateZotero(){
+function updateZotero() {
     getBib(
         window.localStorage.getItem('zotero-user-id'),
         window.localStorage.getItem('zotero-api-key')
@@ -860,7 +897,7 @@ function showLoading() {
 }
 
 function updateLoadingMessage(msg = "") {
-    document.querySelector("#loading-container > .loader-message").textContent = msg
+    document.getElementsByClassName("loader-message")[0].textContent = msg
 }
 
 function hideLoading() {
