@@ -8,33 +8,7 @@ const mainData = (window.localStorage.getItem('data') === null) ? createCollecti
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
-
-// getBib().then(items_list => {
-//     mainData.bib = items_list
-
-
-// First create the dropdown
-const drop_container = document.getElementById('citaitons-dropdown')
-const srcs_container = document.getElementById('sources-container')
-const search_box = document.getElementById('citation-search')
-
-search_box.value = ""
-
-while (srcs_container.firstChild) {
-    srcs_container.removeChild(srcs_container.firstChild);
-}
-
-for (const pair of getCitationList(mainData.bib)) {
-    const item = document.createElement('div')
-    item.innerHTML = pair.div
-    item.classList.add('citation-list-item')
-
-    srcs_container.appendChild(item)
-}
-
-drop_container.classList.remove('hidden')
-search_box.focus()
-// })
+updateZotero()
 
 class QuillCitationBlot extends Parchment.Embed {
     static create(value) {
