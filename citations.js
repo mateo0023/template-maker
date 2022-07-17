@@ -5,7 +5,7 @@
 // **************************************************
 
 // Promise resolves with bibliography or rejects with new credentials
-function getBib(user_id, api_key) {
+function getBib(user_id, api_key, collection) {
     return new Promise((resolve, reject) => {
         if (user_id == null || api_key == null) {
             getCredentials(
@@ -14,14 +14,21 @@ function getBib(user_id, api_key) {
             )
                 .then(reject)
         } else {
-            axios.get(`https://api.zotero.org/users/${user_id}/items`, {
+            let url;
+            if (collection === undefined) {
+                url = `https://api.zotero.org/users/${user_id}/items`
+            } else {
+                url = `https://api.zotero.org/users/${user_id}/collections/${collection}/items`
+            }
+            axios.get(url, {
                 headers: {
                     'Zotero-API-Key': api_key
                 },
                 params: {
                     format: 'json',
                     include: 'data,bib',
-                    style: 'ieee'
+                    style: 'ieee',
+                    linkwrap: 1
                 }
             })
                 .then(r => {
@@ -29,10 +36,49 @@ function getBib(user_id, api_key) {
                 })
                 .catch(e => {
                     let hint;
-                    if (e?.response.status === 500) {
+                    if (e?.response?.status === 500) {
                         hint = 'Your User ID may be incorrect'
                     } else {
-                        hint = e?.response.data
+                        hint = e?.response?.data
+                    }
+                    getCredentials(
+                        user_id,
+                        api_key,
+                        hint
+                    )
+                        .then(reject)
+                })
+        }
+    })
+}
+
+// Promise resolves with library collections array or rejects with new credentials
+function getZoteroCollections(user_id, api_key) {
+    return new Promise((resolve, reject) => {
+        if (user_id == null || api_key == null) {
+            getCredentials(
+                user_id,
+                api_key
+            )
+                .then(reject)
+        } else {
+            axios.get(`https://api.zotero.org/users/${user_id}/collections`, {
+                headers: {
+                    'Zotero-API-Key': api_key
+                },
+                params: {
+                    format: 'json',
+                }
+            })
+                .then(r => {
+                    resolve(r.data)
+                })
+                .catch(e => {
+                    let hint;
+                    if (e?.response?.status === 500) {
+                        hint = 'Your User ID may be incorrect'
+                    } else {
+                        hint = e?.response?.data
                     }
                     getCredentials(
                         user_id,
@@ -111,6 +157,25 @@ function getWorksCitedText(bib, citations) {
     let bibliography = ''
     for (const [key, idx] of list) {
         bibliography += `${idx}. ${getTextFromKey(bib, key)}\n`
+    }
+
+    return bibliography
+}
+
+function getWorksCitedHTML(bib, citations) {
+    const list = new Array();
+    for (const citation in citations) {
+        list.push([citation, citations[citation]]);
+    }
+    list.sort((a, b) => a[1] - b[1])
+
+    let bibliography = ''
+    const parser = new DOMParser()
+    for (const [key, idx] of list) {
+        const citation = parser.parseFromString(getItemByKey(bib, key).bib.trim(), 'text/xml')
+        citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
+
+        bibliography += citation.activeElement.innerHTML
     }
 
     return bibliography
@@ -198,6 +263,8 @@ function getAuthorsByKey(bib, key) {
 export {
     getCitationIndexes,
     getBib,
+    getZoteroCollections,
     getCitationList,
     getWorksCitedText,
+    getWorksCitedHTML
 }

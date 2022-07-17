@@ -1,14 +1,11 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-import { getCitationIndexes, getBib, getCitationList, getWorksCitedText } from "./citations.js"
-
-// const Parchment = Quill.import('parchment')
+import { getCitationIndexes, getBib, getZoteroCollections, getCitationList, getWorksCitedText, getWorksCitedHTML } from "./citations.js"
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
-updateZotero()
 
 class QuillCitationBlot extends Quill.import('blots/embed') {
     static blotName = 'citation'
@@ -40,10 +37,10 @@ class QuillCitationBlot extends Quill.import('blots/embed') {
     }
 
     // All blank so that they cannot be formatted
-    static formats(domNode) {}
+    static formats(domNode) { }
 
     // Apply format to blot. Should not pass onto child or other blot.
-    format(format, value) {}
+    format(format, value) { }
 
     // Return formats represented by blot, including from Attributors.
     formats() { return {} }
@@ -85,15 +82,20 @@ class QuillCitationManager {
 
                             this.quill.setContents(currentSlide.content, 'api')
                         } else {
-                            const sould_re_update = idx_to_add === this.quill.getLength()
+                            const adding_at_end = idx_to_add === this.quill.getLength() - 1
 
-                            this.quill.insertEmbed(idx_to_add, 'citation', { key: citation_id, index: currentArticle.full_text_citations?.[citation_id] }, 'api')
+                            const citation_idx = currentArticle.full_text_citations?.[citation_id]
+                            this.quill.insertEmbed(idx_to_add, 'citation', {
+                                key: citation_id,
+                                index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_id
+                            }, 'api')
 
                             Article.setFullLength(currentArticle, this.quill.getContents())
                             Article.updateFullTextCitations(currentArticle, this.quill.getContents())
 
-                            if (sould_re_update)
+                            if (!adding_at_end) {
                                 this.quill.setContents(currentArticle.full_text)
+                            }
                         }
 
 
@@ -153,22 +155,49 @@ class QuillCitationManager {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-            for (const pair of getCitationList(mainData.bib)) {
-                const item = document.createElement('div')
-                item.innerHTML = pair.div
-                item.classList.add('citation-list-item')
 
-                // Item should resolve the promise once clicked and hide everything
-                item.addEventListener('click', (e) => {
-                    drop_container.classList.add('hidden')
-                    resolve(pair.key)
-                })
+            if (currentArticle?.zotero_collection?.key === undefined || currentArticle?.zotero_collection?.key === "undefined") {
+                for (const pair of getCitationList(mainData.bib)) {
+                    const item = document.createElement('div')
+                    item.innerHTML = pair.div
+                    item.classList.add('citation-list-item')
 
-                srcs_container.appendChild(item)
+                    // Item should resolve the promise once clicked and hide everything
+                    item.addEventListener('click', (e) => {
+                        drop_container.classList.add('hidden')
+                        resolve(pair.key)
+                    })
+
+                    srcs_container.appendChild(item)
+                }
+
+                drop_container.classList.remove('hidden')
+                search_box.focus()
+            } else {
+                getBib(
+                    window.localStorage.getItem('zotero-user-id'),
+                    window.localStorage.getItem('zotero-api-key'),
+                    currentArticle.zotero_collection.key
+                )
+                    .then((bib) => {
+                        for (const pair of getCitationList(bib)) {
+                            const item = document.createElement('div')
+                            item.innerHTML = pair.div
+                            item.classList.add('citation-list-item')
+
+                            // Item should resolve the promise once clicked and hide everything
+                            item.addEventListener('click', (e) => {
+                                drop_container.classList.add('hidden')
+                                resolve(pair.key)
+                            })
+
+                            srcs_container.appendChild(item)
+                        }
+                        drop_container.classList.remove('hidden')
+                        search_box.focus()
+                    })
             }
 
-            drop_container.classList.remove('hidden')
-            search_box.focus()
         })
     }
 
@@ -200,6 +229,7 @@ class Article {
             instagram_citations: {},
             full_text: {},
             full_text_citations: {},
+            zotero_collection: { key: undefined, name: "" }
         }
     }
 
@@ -215,6 +245,13 @@ class Article {
 
     static setFullLength(art, quill) {
         art.full_text = quill
+    }
+
+    static setZoteroCollection(art, key, name) {
+        art.zotero_collection = {
+            key: key,
+            name: name
+        }
     }
 
     // Add a slide Object and return it
@@ -322,7 +359,6 @@ const quillSlide = new Quill('#slide_content', {
         'script',
         'list',
         'citation',
-        // 'citationEnd',
     ]
 });
 
@@ -338,19 +374,6 @@ const quillDescription = new Quill('#article-description', {
     theme: 'snow',
     formats: []
 });
-
-const quillSources = new Quill('#sources-intput', {
-    modules: {
-        toolbar: "",
-        history: {
-            maxStack: 250,
-            userOnly: true
-        }
-    },
-    placeholder: 'Article\'s Sources',
-    theme: 'snow',
-    formats: []
-})
 
 const quillArticle = new Quill('#article-qill', {
     modules: {
@@ -391,6 +414,7 @@ const quillArticle = new Quill('#article-qill', {
         'formula',
         'image',
         'video',
+        'citation'
     ]
 });
 
@@ -400,8 +424,6 @@ const makeBaseAndUpdate = () => {
     // Article.updateInstaCitations(currentArticle)
     updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
-
-updateArticlesList()
 
 // When you change slide contents
 quillSlide.on('text-change', (delta, oldContents, source) => {
@@ -417,17 +439,10 @@ quillDescription.on('text-change', (delta, old_contents, source) => {
     }
 })
 
-quillSources.on('text-change', (delta, old_content, source) => {
-    if (currentArticle && source === "user") {
-        console.log(`Still Working adding this to bib: ${quillSources.getText()}`)
-        // currentArticle.bib = new Cite(quillSources.getText())
-    }
-})
-
 // When you change slide contents
 quillArticle.on('text-change', (delta, oldContents, source) => {
     if (currentArticle && source === "user") {
-        currentArticle.article = quillArticle.getContents();
+        currentArticle.full_text = quillArticle.getContents();
     }
 })
 
@@ -465,10 +480,10 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
         const citaitons = art.instagram_citations
 
-        if (art?.article !== undefined) {
-            quillArticle.setContents(art.article)
+        if (art?.full_text !== undefined) {
+            quillArticle.setContents(art.full_text)
             zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
-            zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
+            zip.file(`${folder_name}/article.json`, JSON.stringify(art.full_text))
         }
 
         if (art?.desc !== undefined) {
@@ -550,11 +565,20 @@ document.getElementById('import-btn').addEventListener('click', () => {
             saveToBrowser(false)
             updateArticlesList()
         })
-        .catch(err => { console.log(err) })
+        .catch(err => { console.trace(err) })
 })
 
 document.getElementById('zotero-btn').addEventListener('click', () => {
     updateZotero()
+})
+
+document.getElementById('z-collection-selector').addEventListener('input', e => {
+    for (const options of e.target.children) {
+        if (options.value === e.target.value) {
+            Article.setZoteroCollection(currentArticle, e.target.value, options.text)
+            return;
+        }
+    }
 })
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
@@ -704,18 +728,36 @@ document.getElementById('citation-search').addEventListener('input', e => {
 })
 
 function updateZotero() {
-    getBib(
+    return getZoteroCollections(
         window.localStorage.getItem('zotero-user-id'),
         window.localStorage.getItem('zotero-api-key')
     )
-        .then(items_list => {
-            mainData.bib = items_list
+        .then(collections => {
+            const formatted_collections = new Array()
+            for (const collection of collections) {
+                formatted_collections.push({
+                    key: collection.key,
+                    name: collection.data.name,
+                })
+            }
+            mainData.zotero_collections = formatted_collections
+            return formatted_collections
         })
         .catch((new_credentials) => {
             window.localStorage.setItem('zotero-user-id', new_credentials.user_id)
             window.localStorage.setItem('zotero-api-key', new_credentials.api_key)
-            updateZotero()
+            return updateZotero()
         })
+        .finally(() => {
+            return getBib(
+                window.localStorage.getItem('zotero-user-id'),
+                window.localStorage.getItem('zotero-api-key')
+            )
+                .then(items_list => {
+                    mainData.bib = items_list
+                })
+        })
+
 }
 
 function draggoverHandler(e) {
@@ -761,6 +803,31 @@ function dropHandler(e, slide = currentSlide) {
     })
 }
 
+function updateZoteroCollectionHTML(current_coll_key) {
+    if (mainData?.zotero_collections === undefined) return;
+
+    const zotero_drop_down = document.getElementById('z-collection-selector')
+    while (zotero_drop_down.firstChild) {
+        zotero_drop_down.removeChild(zotero_drop_down.firstChild)
+    }
+
+    const opt = document.createElement('option')
+    opt.value = undefined
+    opt.text = "Full Library"
+    zotero_drop_down.appendChild(opt)
+
+    for (const collection of mainData?.zotero_collections) {
+        const opt = document.createElement('option')
+        opt.value = collection.key
+        opt.text = collection.name
+        zotero_drop_down.appendChild(opt)
+
+        if (collection.key === current_coll_key) {
+            opt.selected = true
+        }
+    }
+}
+
 function updateArticlesList(update_current = true) {
     let list = document.getElementById("articles_list");
     clearChildren(list)
@@ -786,7 +853,7 @@ function updateArticlesList(update_current = true) {
                 quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
                 quillDescription.history.clear();
 
-                quillArticle.setContents(currentArticle?.article)
+                quillArticle.setContents(currentArticle?.full_text)
                 quillArticle.history.clear();
             })
 
@@ -798,13 +865,15 @@ function updateArticlesList(update_current = true) {
         quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
         quillDescription.history.clear();
 
-        quillArticle.setContents(currentArticle?.article)
+        quillArticle.setContents(currentArticle?.full_text)
         quillArticle.history.clear();
 
         updateSlidesList(update_current);
     } else {
         addArticle(true)
     }
+
+    updateZoteroCollectionHTML(currentArticle?.zotero_collection?.key)
 }
 
 function updateSlidesList(update_current = true) {
@@ -955,3 +1024,7 @@ function moveItemDownInArray(item, array) {
             [array[old_idx + 1], array[old_idx]]
     }
 }
+
+
+updateZotero()
+.finally(() => updateArticlesList())
