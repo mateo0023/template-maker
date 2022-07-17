@@ -174,6 +174,7 @@ function getWorksCitedHTML(bib, citations) {
     for (const [key, idx] of list) {
         const citation = parser.parseFromString(getItemByKey(bib, key).bib.trim(), 'text/xml')
         citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
+        citation.activeElement.children[0].id = `@${key}`
 
         bibliography += citation.activeElement.innerHTML
     }

@@ -21,7 +21,7 @@ class QuillCitationBlot extends Quill.import('blots/embed') {
         } else {
             const sup = document.createElement('sup')
             const link = document.createElement('a')
-            link.href = `#${value.key}`
+            link.href = `#@${value.key}`
             link.textContent = value.index
             sup.appendChild(link)
             node.appendChild(sup)
@@ -67,47 +67,48 @@ class QuillCitationManager {
                 const idx_to_add = (retain_obj === undefined) ? 0 : retain_obj.retain
 
                 this.quill.enable(false)
-                this.#getCitationId(idx_to_add + 1).then(res => {
-                    const citation_id = res
-                    if (citation_id !== undefined && citation_id !== "") {
-                        this.quill.deleteText(idx_to_add, 1)
+                this.#getCitationKey(idx_to_add + 1).then(citation_key => {
+                    this.quill.deleteText(idx_to_add, 1)
 
-                        // Should consider a better thing than this something like "global[this.var_name]"
-                        if (this.options.version !== CitationManagerModes.FULL_TEXT) {
-                            this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_id], key: citation_id }, 'api')
+                    // Should consider a better thing than this something like "global[this.var_name]"
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_key], key: citation_key }, 'api')
 
-                            Slide.setContents(currentSlide, this.quill.getContents())
-                            Article.updateInstaCitations(currentArticle)
-                            updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                        Article.updateInstaCitations(currentArticle)
 
-                            this.quill.setContents(currentSlide.content, 'api')
-                        } else {
-                            const adding_at_end = idx_to_add === this.quill.getLength() - 1
-
-                            const citation_idx = currentArticle.full_text_citations?.[citation_id]
-                            this.quill.insertEmbed(idx_to_add, 'citation', {
-                                key: citation_id,
-                                index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_id
-                            }, 'api')
-
-                            Article.setFullLength(currentArticle, this.quill.getContents())
-                            Article.updateFullTextCitations(currentArticle, this.quill.getContents())
-
-                            if (!adding_at_end) {
-                                this.quill.setContents(currentArticle.full_text)
-                            }
-                        }
-
-
-                        this.quill.enable(true)
-                        this.quill.setSelection(idx_to_add + 2, Quill.sources.API);
+                        this.quill.setContents(currentSlide.content, 'api')
                     } else {
-                        this.quill.enable(true)
-                        this.quill.deleteText(idx_to_add, 1)
+                        const adding_at_end = idx_to_add === this.quill.getLength() - 1
+
+                        const citation_idx = currentArticle.full_text_citations?.[citation_key]
+                        this.quill.insertEmbed(idx_to_add, 'citation', {
+                            key: citation_key,
+                            index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_key
+                        }, 'api')
+
+                        Article.setFullLength(currentArticle, this.quill.getContents())
+                        Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                        document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
+
+                        if (!adding_at_end) {
+                            this.quill.setContents(currentArticle.full_text)
+                        }
                     }
+
+
+                    this.quill.enable(true)
+                    this.quill.setSelection(idx_to_add + 2, Quill.sources.API);
                 }).catch(err => {
                     this.quill.deleteText(idx_to_add, 1)
                     this.quill.enable(true)
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                    }
+                }).finally(() => {
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                    }
                 })
             } else if (delta.ops.some(e => e.delete !== undefined)) {
                 if (
@@ -127,7 +128,7 @@ class QuillCitationManager {
         }
     }
 
-    #getCitationId(quill_idx) {
+    #getCitationKey(quill_idx) {
         return new Promise((resolve, reject) => {
             // First create the dropdown
             const drop_container = document.getElementById('citaitons-dropdown')
@@ -139,16 +140,9 @@ class QuillCitationManager {
             drop_container.style.top = `${top + this.quill.getBounds(quill_idx).top}px`
 
             search_box.value = ""
-            search_box.onblur = (e) => {
-                // Fix for fire order in Chome
-                setTimeout(
-                    () => {
-                        if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
-                            drop_container.classList.add('hidden')
-                            reject('Clicked Away');
-                        }
-                    }, 200
-                )
+            document.getElementById('citaitons-dropdown-close-btn').onclick = (e) => {
+                drop_container.classList.add('hidden')
+                reject('Clicked Away');
             }
 
             while (srcs_container.firstChild) {
@@ -378,7 +372,6 @@ const quillDescription = new Quill('#article-description', {
 const quillArticle = new Quill('#article-qill', {
     modules: {
         toolbar: [
-            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
             ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
             ['blockquote', 'code-block'],
 
@@ -855,6 +848,7 @@ function updateArticlesList(update_current = true) {
 
                 quillArticle.setContents(currentArticle?.full_text)
                 quillArticle.history.clear();
+                document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
             })
 
             if (mainData.articles[i] === currentArticle)
@@ -867,6 +861,7 @@ function updateArticlesList(update_current = true) {
 
         quillArticle.setContents(currentArticle?.full_text)
         quillArticle.history.clear();
+        document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
 
         updateSlidesList(update_current);
     } else {
@@ -1027,4 +1022,4 @@ function moveItemDownInArray(item, array) {
 
 
 updateZotero()
-.finally(() => updateArticlesList())
+    .finally(() => updateArticlesList())
