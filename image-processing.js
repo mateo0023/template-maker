@@ -530,7 +530,7 @@ function processContent(_canvas, content_obj, cite_key_value = {}) {
 
 
     // Remove all the trailing '\n'
-    text = text.replace(/\n*$/, '')
+    text = text.trimEnd()
 
     if (text === '') {
         return null

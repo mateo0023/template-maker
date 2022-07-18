@@ -28,11 +28,12 @@ function getBib(user_id, api_key, collection) {
                     format: 'json',
                     include: 'data,bib',
                     style: 'ieee',
-                    linkwrap: 1
+                    linkwrap: 1,
+                    limit: 100,
                 }
             })
                 .then(r => {
-                    resolve(r.data)
+                    resolve(getTrimmedBib(r.data))
                 })
                 .catch(e => {
                     let hint;
@@ -71,7 +72,14 @@ function getZoteroCollections(user_id, api_key) {
                 }
             })
                 .then(r => {
-                    resolve(r.data)
+                    const formatted_collections = new Array()
+                    for (const collection of r.data) {
+                        formatted_collections.push({
+                            key: collection.key,
+                            name: collection.data.name,
+                        })
+                    }
+                    resolve(formatted_collections)
                 })
                 .catch(e => {
                     let hint;
@@ -148,6 +156,10 @@ function getCredentials(user_id, api_key, hint) {
 // Gets the bibliography from Zotero and the citations - {key: order} pairs.
 // Returns: text of the bibliography as i. bib[key].bib
 function getWorksCitedText(bib, citations) {
+    if (bib === null || citations === null) {
+        return '';
+    }
+
     const list = new Array();
     for (const citation in citations) {
         list.push([citation, citations[citation]]);
@@ -159,10 +171,14 @@ function getWorksCitedText(bib, citations) {
         bibliography += `${idx}. ${getTextFromKey(bib, key)}\n`
     }
 
-    return bibliography
+    return bibliography.trim()
 }
 
 function getWorksCitedHTML(bib, citations) {
+    if (bib === null || citations === null) {
+        return '';
+    }
+
     const list = new Array();
     for (const citation in citations) {
         list.push([citation, citations[citation]]);
@@ -172,11 +188,14 @@ function getWorksCitedHTML(bib, citations) {
     let bibliography = ''
     const parser = new DOMParser()
     for (const [key, idx] of list) {
-        const citation = parser.parseFromString(getItemByKey(bib, key).bib.trim(), 'text/xml')
-        citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
-        citation.activeElement.children[0].id = `@${key}`
-
-        bibliography += citation.activeElement.innerHTML
+        const bib_item = getItemByKey(bib, key)?.bib
+        if(bib_item !== undefined){
+            const citation = parser.parseFromString(bib_item.trim(), 'text/xml')
+            citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
+            citation.activeElement.children[0].id = `@${key}`
+    
+            bibliography += citation.activeElement.innerHTML.trim()
+        }
     }
 
     return bibliography
@@ -231,35 +250,16 @@ function getTextFromKey(bib, key) {
     return getTextFromXML(getItemByKey(bib, key).bib)
 }
 
-function getTilteByKey(bib, key) {
-    const title = getItemByKey(bib, key).data.title
-    return (title === undefined) ? '' : title
-}
-
-function getDateByKey(bib, key) {
-    const date = getItemByKey(bib, key).data.date
-    return (date === undefined) ? '' : date
-}
-
-function getAuthorsByKey(bib, key) {
-    const getName = entry => (entry.firstName !== undefined) ? `${entry.firstName[0]}. ${entry.lastName}` : entry.name
-
-    const authors = getItemByKey(bib, key).data.creators
-    if (authors === undefined || authors.length === 0) {
-        return ''
-    } else if (authors.length > 4) {
-        const lead = authors[0]
-        return getName(authors[0]) + '<i>et al.</i>'
-    } else {
-        let names = ''
-        for (let i = 0; i < authors.length - 1; i++) {
-            names += getName(authors[i]) + ', '
-        }
-        names += getName(authors[authors.length - 1])
-        return names
+function getTrimmedBib(bib) {
+    const trimmed = new Array()
+    for (const item of bib) {
+        trimmed.push({
+            bib: item.bib,
+            key: item.key
+        })
     }
+    return trimmed
 }
-
 
 export {
     getCitationIndexes,

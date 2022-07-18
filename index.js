@@ -3,6 +3,7 @@ import { getCitationIndexes, getBib, getZoteroCollections, getCitationList, getW
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
+var cached_collection = (window.localStorage.getItem('zotero-cache-collection') === null) ? createCachedZotero() : JSON.parse(window.localStorage.getItem('zotero-cache-collection'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
@@ -84,7 +85,7 @@ class QuillCitationManager {
                         const citation_idx = currentArticle.full_text_citations?.[citation_key]
                         this.quill.insertEmbed(idx_to_add, 'citation', {
                             key: citation_key,
-                            index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_key
+                            index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_idx
                         }, 'api')
 
                         Article.setFullLength(currentArticle, this.quill.getContents())
@@ -135,6 +136,24 @@ class QuillCitationManager {
             const srcs_container = document.getElementById('sources-container')
             const search_box = document.getElementById('citation-search')
 
+            const processHTML = (bib) => {
+                for (const pair of getCitationList(bib)) {
+                    const item = document.createElement('div')
+                    item.innerHTML = pair.div
+                    item.classList.add('citation-list-item')
+        
+                    // Item should resolve the promise once clicked and hide everything
+                    item.addEventListener('click', (e) => {
+                        drop_container.classList.add('hidden')
+                        resolve(pair.key)
+                    })
+        
+                    srcs_container.appendChild(item)
+                }
+                drop_container.classList.remove('hidden')
+                search_box.focus()
+            }
+
             const { left, top } = this.quill.container.getBoundingClientRect()
             drop_container.style.left = `${left + this.quill.getBounds(quill_idx).left}px`
             drop_container.style.top = `${top + this.quill.getBounds(quill_idx).top}px`
@@ -151,22 +170,9 @@ class QuillCitationManager {
 
 
             if (currentArticle?.zotero_collection?.key === undefined || currentArticle?.zotero_collection?.key === "undefined") {
-                for (const pair of getCitationList(mainData.bib)) {
-                    const item = document.createElement('div')
-                    item.innerHTML = pair.div
-                    item.classList.add('citation-list-item')
-
-                    // Item should resolve the promise once clicked and hide everything
-                    item.addEventListener('click', (e) => {
-                        drop_container.classList.add('hidden')
-                        resolve(pair.key)
-                    })
-
-                    srcs_container.appendChild(item)
-                }
-
-                drop_container.classList.remove('hidden')
-                search_box.focus()
+                processHTML(mainData.bib)
+            } else if (cached_collection.key !== undefined &&  cached_collection.key === currentArticle.zotero_collection.key){
+                processHTML(cached_collection.bib)
             } else {
                 getBib(
                     window.localStorage.getItem('zotero-user-id'),
@@ -174,21 +180,17 @@ class QuillCitationManager {
                     currentArticle.zotero_collection.key
                 )
                     .then((bib) => {
-                        for (const pair of getCitationList(bib)) {
-                            const item = document.createElement('div')
-                            item.innerHTML = pair.div
-                            item.classList.add('citation-list-item')
-
-                            // Item should resolve the promise once clicked and hide everything
-                            item.addEventListener('click', (e) => {
-                                drop_container.classList.add('hidden')
-                                resolve(pair.key)
-                            })
-
-                            srcs_container.appendChild(item)
+                        console.log(bib)
+                        console.log(mainData.bib)
+                        cached_collection = createCachedZotero(currentArticle.zotero_collection.key, bib)
+                        processHTML(bib)
+                        for(const item of bib){
+                            if(!mainData.bib.includes(item)){
+                                console.log("Adding:")
+                                console.log(item)
+                                mainData.bib.push(item)
+                            }
                         }
-                        drop_container.classList.remove('hidden')
-                        search_box.focus()
                     })
             }
 
@@ -428,7 +430,7 @@ quillSlide.on('text-change', (delta, oldContents, source) => {
 // When you change slide contents
 quillDescription.on('text-change', (delta, old_contents, source) => {
     if (currentArticle && source === "user") {
-        currentArticle.desc = quillDescription.getText();
+        currentArticle.desc = quillDescription.getText().trim();
     }
 })
 
@@ -438,23 +440,6 @@ quillArticle.on('text-change', (delta, oldContents, source) => {
         currentArticle.full_text = quillArticle.getContents();
     }
 })
-
-// Check the policy agreement
-{
-    const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
-    if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
-        document.getElementById("policyNotice").style.display = "block";
-    } else {
-        document.getElementById("policyNotice").style.display = "none";
-    }
-
-    document.getElementById('acknowledge-btn').addEventListener('click', () => {
-        const now = new Date()
-        now.setMonth(now.getMonth() + 1)
-        window.localStorage.setItem('accepted-terms-expiration', now.toString())
-        document.getElementById("policyNotice").style.display = "none";
-    })
-}
 
 document.getElementById('save-progress').addEventListener('click', () => {
     showLoading()
@@ -471,19 +456,20 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 
     for (const art of mainData.articles) {
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
-        const citaitons = art.instagram_citations
+        const insta_citaitons = art.instagram_citations
 
         if (art?.full_text !== undefined) {
             quillArticle.setContents(art.full_text)
             zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
             zip.file(`${folder_name}/article.json`, JSON.stringify(art.full_text))
+            zip.file(`${folder_name}/article_citations.html`, getWorksCitedHTML(mainData.bib, art?.full_text_citations))
         }
 
         if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}\n\nResources:\n${getWorksCitedText(mainData.bib, citaitons)}`, { binary: false })
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}\n\nResources:\n${getWorksCitedText(mainData.bib, insta_citaitons)}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
-            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], citaitons), { base64: true, createFolders: true })
+            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], insta_citaitons), { base64: true, createFolders: true })
         }
     }
 
@@ -726,15 +712,8 @@ function updateZotero() {
         window.localStorage.getItem('zotero-api-key')
     )
         .then(collections => {
-            const formatted_collections = new Array()
-            for (const collection of collections) {
-                formatted_collections.push({
-                    key: collection.key,
-                    name: collection.data.name,
-                })
-            }
-            mainData.zotero_collections = formatted_collections
-            return formatted_collections
+            mainData.zotero_collections = collections
+            return collections
         })
         .catch((new_credentials) => {
             window.localStorage.setItem('zotero-user-id', new_credentials.user_id)
@@ -822,7 +801,7 @@ function updateZoteroCollectionHTML(current_coll_key) {
 }
 
 function updateArticlesList(update_current = true) {
-    let list = document.getElementById("articles_list");
+    const list = document.getElementById("articles_list");
     clearChildren(list)
 
     if (mainData.articles.length > 0) {
@@ -830,8 +809,8 @@ function updateArticlesList(update_current = true) {
             currentArticle = mainData.articles[0];
         }
         for (let i = 0; i < mainData.articles.length; i++) {
-            let new_it = document.createElement('li')
-            let new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
+            const new_it = document.createElement('li')
+            const new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
             new_it.appendChild(new_it_text)
             new_it.value = i;
             new_it.addEventListener('click', (e) => {
@@ -932,7 +911,7 @@ function updateDOMSlide() {
 }
 
 function addArticle(update_current = false) {
-    currentArticle.desc = quillDescription.getText()
+    currentArticle.desc = quillDescription.getText().trim()
 
     currentArticle = Article.create()
     currentSlide = currentArticle.slides[0]
@@ -954,6 +933,7 @@ function saveToBrowser(update_current = true) {
         Article.updateInstaCitations(currentArticle)
     }
     window.localStorage.setItem('data', JSON.stringify(mainData))
+    window.localStorage.setItem('zotero-cache-collection', JSON.stringify(cached_collection))
 }
 
 function showLoading() {
@@ -993,6 +973,13 @@ function createCollectionObj() {
     }
 }
 
+function createCachedZotero(key = undefined, bib = undefined){
+    return {
+        key: key,
+        bib: bib
+    }
+}
+
 // Since it's pass-by-ref, there's no need to return the array
 function removeItemFromArr(arr, item) {
     for (var i = 0; i < arr.length; i++) {
@@ -1021,5 +1008,23 @@ function moveItemDownInArray(item, array) {
 }
 
 
+
+// Check the policy agreement
+{
+    const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
+    if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
+        document.getElementById("policyNotice").style.display = "block";
+    } else {
+        document.getElementById("policyNotice").style.display = "none";
+    }
+
+    document.getElementById('acknowledge-btn').addEventListener('click', () => {
+        const now = new Date()
+        now.setMonth(now.getMonth() + 1)
+        window.localStorage.setItem('accepted-terms-expiration', now.toString())
+        document.getElementById("policyNotice").style.display = "none";
+    })
+}
+
+updateArticlesList()
 updateZotero()
-    .finally(() => updateArticlesList())
