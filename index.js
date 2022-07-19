@@ -1,32 +1,51 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
-import { getCitationIndexes } from "./citations.js"
-
-const Parchment = Quill.import('parchment')
+import { getCitationIndexes, getBib, getZoteroCollections, getCitationList, getWorksCitedText, getWorksCitedHTML } from "./citations.js"
 
 // Main data object
 const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
+var cached_collection = (window.localStorage.getItem('zotero-cache-collection') === null) ? createCachedZotero() : JSON.parse(window.localStorage.getItem('zotero-cache-collection'));
 var currentArticle;
 var currentSlide;
 var curr_slide_list_item;
 
-class QuillCitationBlot extends Parchment.Embed {
+class QuillCitationBlot extends Quill.import('blots/embed') {
+    static blotName = 'citation'
+    static tagName = 'citation'
+
     static create(value) {
-        let node = super.create();
+        const node = super.create();
         node.setAttribute('key', value.key);
-        node.setAttribute('contenteditable', false);
-        node.textContent = `@${value.key}`
-        // node.textContent = getString(node);
+        node.setAttribute('index', value?.index);
+        if (value.index === 'undefined' || value.index === undefined) {
+            node.textContent = `@${value.key}`
+            node.style = "background-color: #ddd; text-decoration: underline;"
+        } else {
+            const sup = document.createElement('sup')
+            const link = document.createElement('a')
+            link.href = `#@${value.key}`
+            link.textContent = value.index
+            sup.appendChild(link)
+            node.appendChild(sup)
+        }
         return node;
     }
 
     static value(node) {
         return {
-            key: node.getAttribute('key')
+            key: node.getAttribute('key'),
+            index: node.getAttribute('index')
         }
     }
+
+    // All blank so that they cannot be formatted
+    static formats(domNode) { }
+
+    // Apply format to blot. Should not pass onto child or other blot.
+    format(format, value) { }
+
+    // Return formats represented by blot, including from Attributors.
+    formats() { return {} }
 }
-QuillCitationBlot.blotName = "citation"
-QuillCitationBlot.tagName = "citation"
 Quill.register(QuillCitationBlot)
 
 
@@ -49,36 +68,60 @@ class QuillCitationManager {
                 const idx_to_add = (retain_obj === undefined) ? 0 : retain_obj.retain
 
                 this.quill.enable(false)
-                this.#getCitationId(idx_to_add + 1).then(res => {
-                    const citation_id = res
-                    if (citation_id !== undefined && citation_id !== "") {
-                        this.quill.deleteText(idx_to_add, 1)
+                this.#getCitationKey(idx_to_add + 1).then(citation_key => {
+                    this.quill.deleteText(idx_to_add, 1)
 
-                        this.quill.insertEmbed(idx_to_add, 'citation', { idx: 0, key: citation_id }, 'api')
+                    // Should consider a better thing than this something like "global[this.var_name]"
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_key], key: citation_key }, 'api')
 
-                        this.quill.enable(true)
-                        this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                        Article.updateInstaCitations(currentArticle)
 
-                        // Should consider a better thing than this something like "global[this.var_name]"
-                        if(this.options.version !== CitationManagerModes.FULL_TEXT){
-                            Slide.setContents(currentSlide, this.quill.getContents())
-                            Article.updateInstaCitations(currentArticle)
-                            updateImagePreview(currentSlide, currentArticle.instagram_citations)
-                        } else {
-                            Article.updateFullTextCitations(currentArticle, this.quill.getContents())
-                        }
+                        this.quill.setContents(currentSlide.content, 'api')
                     } else {
-                        this.quill.enable(true)
-                        this.quill.deleteText(idx_to_add, 1)
+                        const adding_at_end = idx_to_add === this.quill.getLength() - 1
+
+                        let citation_idx = currentArticle?.full_text_citations?.[citation_key]
+                        if(citation_idx === undefined && adding_at_end) {
+                            if(currentArticle.full_text_citations === undefined){
+                                citation_idx = 1
+                            } else {
+                                citation_idx = Object.keys(currentArticle.full_text_citations).length + 1
+                            }
+                        }
+                        this.quill.insertEmbed(idx_to_add, 'citation', {
+                            key: citation_key,
+                            index: citation_idx
+                        }, 'api')
+
+                        Article.setFullLength(currentArticle, this.quill.getContents())
+                        Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                        document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
+
+                        if (!adding_at_end) {
+                            this.quill.setContents(currentArticle.full_text)
+                        }
                     }
+
+
+                    this.quill.enable(true)
+                    this.quill.setSelection(idx_to_add + 2, Quill.sources.API);
                 }).catch(err => {
                     this.quill.deleteText(idx_to_add, 1)
                     this.quill.enable(true)
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        Slide.setContents(currentSlide, this.quill.getContents())
+                    }
+                }).finally(() => {
+                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                        updateImagePreview(currentSlide, currentArticle.instagram_citations)
+                    }
                 })
             } else if (delta.ops.some(e => e.delete !== undefined)) {
                 if (
                     // Finds deleted blobs and then checks wether at least one is a citation object
-                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined).retain, delta.ops.find(e => e.delete !== undefined).delete)
+                    QuillCitationManager.findDeletedBlobs(prev, delta.ops.find(e => e?.retain !== undefined)?.retain, delta.ops.find(e => e.delete !== undefined).delete)
                         .some(e => e?.insert?.citation !== undefined)
                 ) {
                     if (this.options.version !== CitationManagerModes.FULL_TEXT) {
@@ -93,7 +136,7 @@ class QuillCitationManager {
         }
     }
 
-    #getCitationId(quill_idx) {
+    #getCitationKey(quill_idx) {
         return new Promise((resolve, reject) => {
             // First create the dropdown
             const drop_container = document.getElementById('citaitons-dropdown')
@@ -101,46 +144,63 @@ class QuillCitationManager {
             const search_box = document.getElementById('citation-search')
             drop_container.classList.remove('hidden')
 
+            const processHTML = (bib) => {
+                for (const pair of getCitationList(bib)) {
+                    const item = document.createElement('div')
+                    item.innerHTML = pair.div
+                    item.classList.add('citation-list-item')
+
+                    // Item should resolve the promise once clicked and hide everything
+                    item.addEventListener('click', (e) => {
+                        drop_container.classList.add('hidden')
+                        resolve(pair.key)
+                    })
+
+                    srcs_container.appendChild(item)
+                }
+                drop_container.classList.remove('hidden')
+                search_box.focus()
+            }
+
             const { left, top } = this.quill.container.getBoundingClientRect()
             drop_container.style.left = `${left + this.quill.getBounds(quill_idx).left}px`
             drop_container.style.top = `${top + this.quill.getBounds(quill_idx).top}px`
 
             search_box.value = ""
-            search_box.onblur = (e) => {
-                // Fix for fire order in Chome
-                setTimeout(
-                    () => {
-                        if (!((e.explicitOriginalTarget?.classList)?.contains('citation-list-item') || (e.explicitOriginalTarget?.parentNode?.classList)?.contains('citation-list-item'))) {
-                            drop_container.classList.add('hidden')
-                            reject('Clicked Away');
-                        }
-                    }, 200
-                )
+            document.getElementById('citaitons-dropdown-close-btn').onclick = (e) => {
+                drop_container.classList.add('hidden')
+                reject('Clicked Away');
             }
 
             while (srcs_container.firstChild) {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-            for (const id of ['aguera-arcasLargeLanguageModels2022', 'antonySecretaryBlinkenRemarks2021', 'thoppilanLaMDALanguageModels2022']) {
-                const item = document.createElement('div')
-                item.innerHTML = id
-                item.classList.add('citation-list-item')
-
-                // Item should resolve the promise once clicked and hide everything
-                item.addEventListener('click', (e) => {
-                    drop_container.classList.add('hidden')
-                    resolve(id)
-                })
-
-                srcs_container.appendChild(item)
+            if (currentArticle?.zotero_collection?.key === undefined || currentArticle?.zotero_collection?.key === "undefined") {
+                processHTML(mainData.bib)
+            } else if (cached_collection.key !== undefined && cached_collection.key === currentArticle.zotero_collection.key) {
+                processHTML(cached_collection.bib)
+            } else {
+                getBib(
+                    window.localStorage.getItem('zotero-user-id'),
+                    window.localStorage.getItem('zotero-api-key'),
+                    currentArticle.zotero_collection.key
+                )
+                    .then((bib) => {
+                        cached_collection = createCachedZotero(currentArticle.zotero_collection.key, bib)
+                        processHTML(bib)
+                        for (const item of bib) {
+                            if (!mainData.bib.includes(item)) {
+                                mainData.bib.push(item)
+                            }
+                        }
+                    })
             }
-
-            search_box.focus()
         })
     }
 
     static findDeletedBlobs(quill, retain, delete_length) {
+        if (retain === undefined) retain = 0;
         const return_obj = new Array()
         let working_idx = 0
         let i = 0;
@@ -166,6 +226,8 @@ class Article {
             desc: "",
             instagram_citations: {},
             full_text: {},
+            full_text_citations: {},
+            zotero_collection: { key: undefined, name: "" }
         }
     }
 
@@ -173,10 +235,21 @@ class Article {
         art.instagram_citations = getCitationIndexes(art.slides)
     }
 
-    static updateFullTextCitations(art, quill){
-        art.full_text = getCitationIndexes([{
+    static updateFullTextCitations(art, quill) {
+        art.full_text_citations = getCitationIndexes([{
             content: quill
         }])
+    }
+
+    static setFullLength(art, quill) {
+        art.full_text = quill
+    }
+
+    static setZoteroCollection(art, key, name) {
+        art.zotero_collection = {
+            key: key,
+            name: name
+        }
     }
 
     // Add a slide Object and return it
@@ -189,6 +262,7 @@ class Article {
 
     static moveSlideUp(art, slide) {
         moveItemUpInArray(slide, art.slides)
+        Article.updateInstaCitations(art)
     }
 
     static moveSlideDown(art, slide) {
@@ -216,7 +290,7 @@ class Slide {
     static create() {
         return {
             title: "",
-            content: {},
+            content: { ops: [] },
             img: {
                 src: "",
                 reverse_fit: false,
@@ -284,7 +358,6 @@ const quillSlide = new Quill('#slide_content', {
         'script',
         'list',
         'citation',
-        // 'citationEnd',
     ]
 });
 
@@ -317,7 +390,6 @@ const quillSources = new Quill('#sources-intput', {
 const quillArticle = new Quill('#article-qill', {
     modules: {
         toolbar: [
-            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
             ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
             ['blockquote', 'code-block'],
 
@@ -353,6 +425,7 @@ const quillArticle = new Quill('#article-qill', {
         'formula',
         'image',
         'video',
+        'citation'
     ]
 });
 
@@ -362,8 +435,6 @@ const makeBaseAndUpdate = () => {
     // Article.updateInstaCitations(currentArticle)
     updateImagePreview(currentSlide, currentArticle.instagram_citations)
 }
-
-updateArticlesList()
 
 // When you change slide contents
 quillSlide.on('text-change', (delta, oldContents, source) => {
@@ -375,7 +446,7 @@ quillSlide.on('text-change', (delta, oldContents, source) => {
 // When you change slide contents
 quillDescription.on('text-change', (delta, old_contents, source) => {
     if (currentArticle && source === "user") {
-        currentArticle.desc = quillDescription.getText();
+        currentArticle.desc = quillDescription.getText().trim();
     }
 })
 
@@ -389,26 +460,9 @@ quillSources.on('text-change', (delta, old_content, source) => {
 // When you change slide contents
 quillArticle.on('text-change', (delta, oldContents, source) => {
     if (currentArticle && source === "user") {
-        currentArticle.article = quillArticle.getContents();
+        currentArticle.full_text = quillArticle.getContents();
     }
 })
-
-// Check the policy agreement
-{
-    const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
-    if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
-        document.getElementById("policyNotice").style.display = "block";
-    } else {
-        document.getElementById("policyNotice").style.display = "none";
-    }
-
-    document.getElementById('acknowledge-btn').addEventListener('click', () => {
-        const now = new Date()
-        now.setMonth(now.getMonth() + 1)
-        window.localStorage.setItem('accepted-terms-expiration', now.toString())
-        document.getElementById("policyNotice").style.display = "none";
-    })
-}
 
 document.getElementById('save-progress').addEventListener('click', () => {
     showLoading()
@@ -425,19 +479,20 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
 
     for (const art of mainData.articles) {
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
-        const citaitons = art.instagram_citations
+        const insta_citaitons = art.instagram_citations
 
-        if (art?.article !== undefined) {
-            quillArticle.setContents(art.article)
+        if (art?.full_text !== undefined) {
+            quillArticle.setContents(art.full_text)
             zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
-            zip.file(`${folder_name}/article.json`, JSON.stringify(art.article))
+            zip.file(`${folder_name}/article.json`, JSON.stringify(art.full_text))
+            zip.file(`${folder_name}/article_citations.html`, getWorksCitedHTML(mainData.bib, art?.full_text_citations))
         }
 
         if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}`, { binary: false })
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title.trim()}\n\n${art.desc.trim()}\n\nResources:\n${getWorksCitedText(mainData.bib, insta_citaitons)}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
-            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], citaitons), { base64: true, createFolders: true })
+            zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], insta_citaitons), { base64: true, createFolders: true })
         }
     }
 
@@ -512,9 +567,18 @@ document.getElementById('import-btn').addEventListener('click', () => {
             saveToBrowser(false)
             updateArticlesList()
         })
-        .catch(err => { console.log(err) })
+        .catch(err => { console.trace(err) })
 })
 
+
+document.getElementById('z-collection-selector').addEventListener('input', e => {
+    for (const options of e.target.children) {
+        if (options.value === e.target.value) {
+            Article.setZoteroCollection(currentArticle, e.target.value, options.text)
+            return;
+        }
+    }
+})
 
 document.getElementById('insta-article-selector').addEventListener('click', (e) => {
     Slide.saveProgress(currentSlide)
@@ -616,9 +680,7 @@ document.getElementById("nxt_btn").addEventListener('click', () => {
         currentSlide = Article.addSlide(currentArticle)
 
         updateSlidesList(false);
-        if (AUTO_SAVE) {
-            saveToBrowser(false);
-        }
+        saveToBrowser(false);
     }
 })
 
@@ -662,19 +724,30 @@ document.getElementById('citation-search').addEventListener('input', e => {
     }
 })
 
-function updateZotero(){
-    getBib(
+function updateZotero() {
+    return getZoteroCollections(
         window.localStorage.getItem('zotero-user-id'),
         window.localStorage.getItem('zotero-api-key')
     )
-        .then(items_list => {
-            mainData.bib = items_list
+        .then(collections => {
+            mainData.zotero_collections = collections
+            return collections
         })
         .catch((new_credentials) => {
             window.localStorage.setItem('zotero-user-id', new_credentials.user_id)
             window.localStorage.setItem('zotero-api-key', new_credentials.api_key)
-            updateZotero()
+            return updateZotero()
         })
+        .finally(() => {
+            return getBib(
+                window.localStorage.getItem('zotero-user-id'),
+                window.localStorage.getItem('zotero-api-key')
+            )
+                .then(items_list => {
+                    mainData.bib = items_list
+                })
+        })
+
 }
 
 function draggoverHandler(e) {
@@ -720,8 +793,33 @@ function dropHandler(e, slide = currentSlide) {
     })
 }
 
+function updateZoteroCollectionHTML(current_coll_key) {
+    if (mainData?.zotero_collections === undefined) return;
+
+    const zotero_drop_down = document.getElementById('z-collection-selector')
+    while (zotero_drop_down.firstChild) {
+        zotero_drop_down.removeChild(zotero_drop_down.firstChild)
+    }
+
+    const opt = document.createElement('option')
+    opt.value = undefined
+    opt.text = "Full Library"
+    zotero_drop_down.appendChild(opt)
+
+    for (const collection of mainData?.zotero_collections) {
+        const opt = document.createElement('option')
+        opt.value = collection.key
+        opt.text = collection.name
+        zotero_drop_down.appendChild(opt)
+
+        if (collection.key === current_coll_key) {
+            opt.selected = true
+        }
+    }
+}
+
 function updateArticlesList(update_current = true) {
-    let list = document.getElementById("articles_list");
+    const list = document.getElementById("articles_list");
     clearChildren(list)
 
     if (mainData.articles.length > 0) {
@@ -729,8 +827,8 @@ function updateArticlesList(update_current = true) {
             currentArticle = mainData.articles[0];
         }
         for (let i = 0; i < mainData.articles.length; i++) {
-            let new_it = document.createElement('li')
-            let new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
+            const new_it = document.createElement('li')
+            const new_it_text = document.createTextNode(Slide.getTitle(mainData.articles[i].slides[0]))
             new_it.appendChild(new_it_text)
             new_it.value = i;
             new_it.addEventListener('click', (e) => {
@@ -745,8 +843,9 @@ function updateArticlesList(update_current = true) {
                 quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
                 quillDescription.history.clear();
 
-                quillArticle.setContents(currentArticle?.article)
+                quillArticle.setContents(currentArticle?.full_text)
                 quillArticle.history.clear();
+                document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
             })
 
             if (mainData.articles[i] === currentArticle)
@@ -757,13 +856,16 @@ function updateArticlesList(update_current = true) {
         quillDescription.setText((currentArticle?.desc === undefined) ? "" : currentArticle.desc)
         quillDescription.history.clear();
 
-        quillArticle.setContents(currentArticle?.article)
+        quillArticle.setContents(currentArticle?.full_text)
         quillArticle.history.clear();
+        document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
 
         updateSlidesList(update_current);
     } else {
         addArticle(true)
     }
+
+    updateZoteroCollectionHTML(currentArticle?.zotero_collection?.key)
 }
 
 function updateSlidesList(update_current = true) {
@@ -827,7 +929,7 @@ function updateDOMSlide() {
 }
 
 function addArticle(update_current = false) {
-    currentArticle.desc = quillDescription.getText()
+    currentArticle.desc = quillDescription.getText().trim()
 
     currentArticle = Article.create()
     currentSlide = currentArticle.slides[0]
@@ -849,6 +951,7 @@ function saveToBrowser(update_current = true) {
         Article.updateInstaCitations(currentArticle)
     }
     window.localStorage.setItem('data', JSON.stringify(mainData))
+    window.localStorage.setItem('zotero-cache-collection', JSON.stringify(cached_collection))
 }
 
 function showLoading() {
@@ -856,7 +959,7 @@ function showLoading() {
 }
 
 function updateLoadingMessage(msg = "") {
-    document.querySelector("#loading-container > .loader-message").textContent = msg
+    document.getElementsByClassName("loader-message")[0].textContent = msg
 }
 
 function hideLoading() {
@@ -888,6 +991,13 @@ function createCollectionObj() {
     }
 }
 
+function createCachedZotero(key = undefined, bib = undefined) {
+    return {
+        key: key,
+        bib: bib
+    }
+}
+
 // Since it's pass-by-ref, there's no need to return the array
 function removeItemFromArr(arr, item) {
     for (var i = 0; i < arr.length; i++) {
@@ -914,3 +1024,27 @@ function moveItemDownInArray(item, array) {
             [array[old_idx + 1], array[old_idx]]
     }
 }
+
+
+
+// Check the policy agreement
+{
+    const expiration_date = window.localStorage.getItem('accepted-terms-expiration')
+    if (expiration_date === null || Date.now() > Date.parse(expiration_date)) {
+        document.getElementById("policyNotice").style.display = "block";
+    } else {
+        document.getElementById("policyNotice").style.display = "none";
+    }
+
+    document.getElementById('acknowledge-btn').addEventListener('click', () => {
+        const now = new Date()
+        now.setMonth(now.getMonth() + 1)
+        window.localStorage.setItem('accepted-terms-expiration', now.toString())
+        document.getElementById("policyNotice").style.display = "none";
+    })
+}
+
+updateArticlesList()
+updateZotero().finally(() => {
+    updateZoteroCollectionHTML(currentArticle?.zotero_collection?.key)
+})
