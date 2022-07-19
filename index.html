@@ -29,6 +29,7 @@
     <div class="header">
         <button id="save-progress">Save Progress</button>
         <button id="export-btn">Export Work</button>
+        <button id="import-btn">Import Work</button>
     </div>
     <div class="global-container">
         <div id="lists_container">
@@ -46,7 +47,8 @@
             </div>
             <div class="instagram">
                 <div id="article-description" class="my-qill"></div>
-                <div></div>
+                <h4>Sources</h4>
+                <div id="sources-intput" class="my-quill"></div>
             </div>
             <div class="slides_list_container instagram">
                 <h1>Slides</h1>
@@ -107,6 +109,16 @@
         </div>
     </div>
 
+
+    <div id="citaitons-dropdown" class="hidden">
+        <input type="text" placeholder="Search..." id="citation-search">
+        <div id="sources-container">
+            <div>Test</div>
+            <div>Hello</div>
+            <div>About</div>
+        </div>
+    </div>
+
     <div id="policyNotice" class="overlay">
         <div class="title-wrap">
             <h4>Usage Policy Consent</h4>
@@ -123,8 +135,10 @@
     </div>
 
     <div id="loading-container" class="overlay">
-        <div class="loader"></div>
-        <div class="loader-message"></div>
+        <div class="loader-container">
+            <div class="loader"></div>
+            <div class="loader-message"></div>
+        </div>
     </div>
 </body>
 
