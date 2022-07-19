@@ -206,9 +206,11 @@ const getDOMFromXML = (() => {
     return xml => parser.parseFromString(xml, 'text/xml').getElementsByClassName('csl-right-inline')[0]
 })()
 
-function getTextFromXML(xml) {
-    return getDOMFromXML(xml).textContent
-}
+// **************************************************
+// **************************************************
+// **************** HELPER FUNCTIONS ****************
+// **************************************************
+// **************************************************
 
 
 // Loops over list of Slides' QuillJs objects, returns key: idx pairs of citations

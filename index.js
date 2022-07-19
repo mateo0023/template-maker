@@ -142,6 +142,7 @@ class QuillCitationManager {
             const drop_container = document.getElementById('citaitons-dropdown')
             const srcs_container = document.getElementById('sources-container')
             const search_box = document.getElementById('citation-search')
+            drop_container.classList.remove('hidden')
 
             const processHTML = (bib) => {
                 for (const pair of getCitationList(bib)) {
@@ -175,7 +176,6 @@ class QuillCitationManager {
                 srcs_container.removeChild(srcs_container.firstChild);
             }
 
-
             if (currentArticle?.zotero_collection?.key === undefined || currentArticle?.zotero_collection?.key === "undefined") {
                 processHTML(mainData.bib)
             } else if (cached_collection.key !== undefined && cached_collection.key === currentArticle.zotero_collection.key) {
@@ -196,7 +196,6 @@ class QuillCitationManager {
                         }
                     })
             }
-
         })
     }
 
@@ -232,7 +231,7 @@ class Article {
         }
     }
 
-    static updateInstaCitations(art) {
+    static updateInstaCitations(art){
         art.instagram_citations = getCitationIndexes(art.slides)
     }
 
@@ -273,7 +272,7 @@ class Article {
 
     static removeSlide(art, slide) {
         const idx = art.slides.indexOf(slide)
-        if (idx > -1) {
+        if(idx > -1){
             art.slides.splice(idx, 1);
         }
         removeItemFromArr(slide, art.slides)
@@ -551,9 +550,6 @@ document.getElementById('import-btn').addEventListener('click', () => {
         .catch(err => { console.trace(err) })
 })
 
-document.getElementById('zotero-btn').addEventListener('click', () => {
-    updateZotero()
-})
 
 document.getElementById('z-collection-selector').addEventListener('input', e => {
     for (const options of e.target.children) {
