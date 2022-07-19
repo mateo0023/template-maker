@@ -1025,4 +1025,6 @@ function moveItemDownInArray(item, array) {
 }
 
 updateArticlesList()
-updateZotero()
+updateZotero().finally(() => {
+    updateZoteroCollectionHTML(currentArticle?.zotero_collection?.key)
+})
