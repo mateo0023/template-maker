@@ -82,10 +82,17 @@ class QuillCitationManager {
                     } else {
                         const adding_at_end = idx_to_add === this.quill.getLength() - 1
 
-                        const citation_idx = currentArticle.full_text_citations?.[citation_key]
+                        let citation_idx = currentArticle?.full_text_citations?.[citation_key]
+                        if(citation_idx === undefined && adding_at_end) {
+                            if(currentArticle.full_text_citations === undefined){
+                                citation_idx = 1
+                            } else {
+                                citation_idx = Object.keys(currentArticle.full_text_citations).length + 1
+                            }
+                        }
                         this.quill.insertEmbed(idx_to_add, 'citation', {
                             key: citation_key,
-                            index: (citation_idx === undefined && adding_at_end) ? Object.keys(currentArticle.full_text_citations).length + 1 : citation_idx
+                            index: citation_idx
                         }, 'api')
 
                         Article.setFullLength(currentArticle, this.quill.getContents())
@@ -141,13 +148,13 @@ class QuillCitationManager {
                     const item = document.createElement('div')
                     item.innerHTML = pair.div
                     item.classList.add('citation-list-item')
-        
+
                     // Item should resolve the promise once clicked and hide everything
                     item.addEventListener('click', (e) => {
                         drop_container.classList.add('hidden')
                         resolve(pair.key)
                     })
-        
+
                     srcs_container.appendChild(item)
                 }
                 drop_container.classList.remove('hidden')
@@ -171,7 +178,7 @@ class QuillCitationManager {
 
             if (currentArticle?.zotero_collection?.key === undefined || currentArticle?.zotero_collection?.key === "undefined") {
                 processHTML(mainData.bib)
-            } else if (cached_collection.key !== undefined &&  cached_collection.key === currentArticle.zotero_collection.key){
+            } else if (cached_collection.key !== undefined && cached_collection.key === currentArticle.zotero_collection.key) {
                 processHTML(cached_collection.bib)
             } else {
                 getBib(
@@ -180,14 +187,10 @@ class QuillCitationManager {
                     currentArticle.zotero_collection.key
                 )
                     .then((bib) => {
-                        console.log(bib)
-                        console.log(mainData.bib)
                         cached_collection = createCachedZotero(currentArticle.zotero_collection.key, bib)
                         processHTML(bib)
-                        for(const item of bib){
-                            if(!mainData.bib.includes(item)){
-                                console.log("Adding:")
-                                console.log(item)
+                        for (const item of bib) {
+                            if (!mainData.bib.includes(item)) {
                                 mainData.bib.push(item)
                             }
                         }
@@ -260,6 +263,7 @@ class Article {
 
     static moveSlideUp(art, slide) {
         moveItemUpInArray(slide, art.slides)
+        Article.updateInstaCitations(art)
     }
 
     static moveSlideDown(art, slide) {
@@ -287,7 +291,7 @@ class Slide {
     static create() {
         return {
             title: "",
-            content: {},
+            content: { ops: [] },
             img: {
                 src: "",
                 reverse_fit: false,
@@ -466,7 +470,7 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
         }
 
         if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title}\n\n${art.desc}\n\nResources:\n${getWorksCitedText(mainData.bib, insta_citaitons)}`, { binary: false })
+            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title.trim()}\n\n${art.desc.trim()}\n\nResources:\n${getWorksCitedText(mainData.bib, insta_citaitons)}`, { binary: false })
         }
         for (let i = 0; i < art.slides.length; i++) {
             zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], insta_citaitons), { base64: true, createFolders: true })
@@ -660,9 +664,7 @@ document.getElementById("nxt_btn").addEventListener('click', () => {
         currentSlide = Article.addSlide(currentArticle)
 
         updateSlidesList(false);
-        if (AUTO_SAVE) {
-            saveToBrowser(false);
-        }
+        saveToBrowser(false);
     }
 })
 
@@ -973,7 +975,7 @@ function createCollectionObj() {
     }
 }
 
-function createCachedZotero(key = undefined, bib = undefined){
+function createCachedZotero(key = undefined, bib = undefined) {
     return {
         key: key,
         bib: bib

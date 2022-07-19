@@ -192,9 +192,9 @@ function getWorksCitedHTML(bib, citations) {
         if(bib_item !== undefined){
             const citation = parser.parseFromString(bib_item.trim(), 'text/xml')
             citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
-            citation.activeElement.children[0].id = `@${key}`
+            citation.firstChild.children[0].id = `@${key}`
     
-            bibliography += citation.activeElement.innerHTML.trim()
+            bibliography += citation.firstChild.outerHTML.trim()
         }
     }
 
@@ -219,12 +219,14 @@ function getCitationIndexes(slide_list) {
     const citation_order = {}
     let total_idx = 0;
     for (const slide of slide_list) {
-        for (const item of slide.content.ops) {
-            if (item.insert?.citation !== undefined) {
-                if (citation_order?.[item.insert.citation.key] === undefined) {
-                    citation_order[item.insert.citation.key] = ++total_idx;
+        if(slide?.content?.ops !== undefined){
+            for (const item of slide?.content?.ops) {
+                if (item.insert?.citation !== undefined) {
+                    if (citation_order?.[item.insert.citation.key] === undefined) {
+                        citation_order[item.insert.citation.key] = ++total_idx;
+                    }
+                    item.insert.citation.index = `${citation_order[item.insert.citation.key]}`
                 }
-                item.insert.citation.index = `${citation_order[item.insert.citation.key]}`
             }
         }
     }
