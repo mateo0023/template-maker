@@ -83,8 +83,8 @@ class QuillCitationManager {
                         const adding_at_end = idx_to_add === this.quill.getLength() - 1
 
                         let citation_idx = currentArticle?.full_text_citations?.[citation_key]
-                        if(citation_idx === undefined && adding_at_end) {
-                            if(currentArticle.full_text_citations === undefined){
+                        if (citation_idx === undefined && adding_at_end) {
+                            if (currentArticle.full_text_citations === undefined) {
                                 citation_idx = 1
                             } else {
                                 citation_idx = Object.keys(currentArticle.full_text_citations).length + 1
@@ -231,7 +231,7 @@ class Article {
         }
     }
 
-    static updateInstaCitations(art){
+    static updateInstaCitations(art) {
         art.instagram_citations = getCitationIndexes(art.slides)
     }
 
@@ -272,7 +272,7 @@ class Article {
 
     static removeSlide(art, slide) {
         const idx = art.slides.indexOf(slide)
-        if(idx > -1){
+        if (idx > -1) {
             art.slides.splice(idx, 1);
         }
         removeItemFromArr(slide, art.slides)
