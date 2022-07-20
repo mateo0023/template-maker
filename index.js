@@ -1,13 +1,6 @@
 import { updateImagePreview, getPosition, getWidth, exportSlideToJpegData } from "./image-processing.js"
 import { getCitationIndexes, getBib, getZoteroCollections, getCitationList, getWorksCitedText, getWorksCitedHTML } from "./citations.js"
 
-// Main data object
-const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
-var cached_collection = (window.localStorage.getItem('zotero-cache-collection') === null) ? createCachedZotero() : JSON.parse(window.localStorage.getItem('zotero-cache-collection'));
-var currentArticle;
-var currentSlide;
-var curr_slide_list_item;
-
 class QuillCitationBlot extends Quill.import('blots/embed') {
     static blotName = 'citation'
     static tagName = 'citation'
@@ -66,58 +59,8 @@ class QuillCitationManager {
             if (delta.ops.some(e => e.insert === "@")) {
                 const retain_obj = delta.ops.find(e => e?.retain !== undefined)
                 const idx_to_add = (retain_obj === undefined) ? 0 : retain_obj.retain
-
-                this.quill.enable(false)
-                this.#getCitationKey(idx_to_add + 1).then(citation_key => {
-                    this.quill.deleteText(idx_to_add, 1)
-
-                    // Should consider a better thing than this something like "global[this.var_name]"
-                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
-                        this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_key], key: citation_key }, 'api')
-
-                        Slide.setContents(currentSlide, this.quill.getContents())
-                        Article.updateInstaCitations(currentArticle)
-
-                        this.quill.setContents(currentSlide.content, 'api')
-                    } else {
-                        const adding_at_end = idx_to_add === this.quill.getLength() - 1
-
-                        let citation_idx = currentArticle?.full_text_citations?.[citation_key]
-                        if (citation_idx === undefined && adding_at_end) {
-                            if (currentArticle.full_text_citations === undefined) {
-                                citation_idx = 1
-                            } else {
-                                citation_idx = Object.keys(currentArticle.full_text_citations).length + 1
-                            }
-                        }
-                        this.quill.insertEmbed(idx_to_add, 'citation', {
-                            key: citation_key,
-                            index: citation_idx
-                        }, 'api')
-
-                        Article.setFullLength(currentArticle, this.quill.getContents())
-                        Article.updateFullTextCitations(currentArticle, this.quill.getContents())
-                        document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
-
-                        if (!adding_at_end) {
-                            this.quill.setContents(currentArticle.full_text)
-                        }
-                    }
-
-
-                    this.quill.enable(true)
-                    this.quill.setSelection(idx_to_add + 2, Quill.sources.API);
-                }).catch(err => {
-                    this.quill.deleteText(idx_to_add, 1)
-                    this.quill.enable(true)
-                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
-                        Slide.setContents(currentSlide, this.quill.getContents())
-                    }
-                }).finally(() => {
-                    if (this.options.version !== CitationManagerModes.FULL_TEXT) {
-                        updateImagePreview(currentSlide, currentArticle.instagram_citations)
-                    }
-                })
+                
+                this.#addCitation(idx_to_add)
             } else if (delta.ops.some(e => e.delete !== undefined)) {
                 if (
                     // Finds deleted blobs and then checks wether at least one is a citation object
@@ -134,6 +77,65 @@ class QuillCitationManager {
                 }
             }
         }
+    }
+
+    #addCitation(idx_to_add = this.quill.getSelection().index){
+        this.quill.enable(false)
+        this.#getCitationKey(idx_to_add + 1).then(citation_key => {
+            this.quill.deleteText(idx_to_add, 1)
+            
+            const [prev_node, offset] = this.quill.getLeaf(idx_to_add)
+            if(prev_node.domNode.nodeName === 'CITATION'){
+                this.quill.insertText(idx_to_add, ',', 'script', 'super', 'api')
+                idx_to_add++
+            }
+
+            // Should consider a better thing than this something like "global[this.var_name]"
+            if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                this.quill.insertEmbed(idx_to_add, 'citation', { index: currentArticle.instagram_citations?.[citation_key], key: citation_key }, 'api')
+
+                Slide.setContents(currentSlide, this.quill.getContents())
+                Article.updateInstaCitations(currentArticle)
+
+                this.quill.setContents(currentSlide.content, 'api')
+            } else {
+                const adding_at_end = idx_to_add === this.quill.getLength() - 1
+
+                let citation_idx = currentArticle?.full_text_citations?.[citation_key]
+                if (citation_idx === undefined && adding_at_end) {
+                    if (currentArticle.full_text_citations === undefined) {
+                        citation_idx = 1
+                    } else {
+                        citation_idx = Object.keys(currentArticle.full_text_citations).length + 1
+                    }
+                }
+                this.quill.insertEmbed(idx_to_add, 'citation', {
+                    key: citation_key,
+                    index: citation_idx
+                }, 'api')
+
+                Article.setFullLength(currentArticle, this.quill.getContents())
+                Article.updateFullTextCitations(currentArticle, this.quill.getContents())
+                document.getElementById('full-txt-references').innerHTML = getWorksCitedHTML(mainData.bib, currentArticle.full_text_citations)
+
+                if (!adding_at_end) {
+                    this.quill.setContents(currentArticle.full_text)
+                }
+            }
+
+            this.quill.enable(true)
+            this.quill.setSelection(idx_to_add + 1, Quill.sources.API);
+        }).catch(err => {
+            this.quill.deleteText(idx_to_add, 1)
+            this.quill.enable(true)
+            if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                Slide.setContents(currentSlide, this.quill.getContents())
+            }
+        }).finally(() => {
+            if (this.options.version !== CitationManagerModes.FULL_TEXT) {
+                updateImagePreview(currentSlide, currentArticle.instagram_citations)
+            }
+        })
     }
 
     #getCitationKey(quill_idx) {
@@ -169,7 +171,7 @@ class QuillCitationManager {
             search_box.value = ""
             document.getElementById('citaitons-dropdown-close-btn').onclick = (e) => {
                 drop_container.classList.add('hidden')
-                reject('Clicked Away');
+                reject('Clicked "Close"');
             }
 
             while (srcs_container.firstChild) {
@@ -338,6 +340,14 @@ class Slide {
 
 Quill.register('modules/citation', QuillCitationManager)
 
+
+// Main data object
+const mainData = (window.localStorage.getItem('data') === null) ? createCollectionObj() : JSON.parse(window.localStorage.getItem('data'));
+var cached_collection = (window.localStorage.getItem('zotero-cache-collection') === null) ? createCachedZotero() : JSON.parse(window.localStorage.getItem('zotero-cache-collection'));
+var currentArticle;
+var currentSlide;
+var curr_slide_list_item;
+
 const quillSlide = new Quill('#slide_content', {
     modules: {
         toolbar: "#toolbar",
@@ -456,8 +466,10 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
     var zip = new JSZip()
 
     zip.file('collection.json', JSON.stringify(mainData))
+    updateLoadingMessage(`Added Collection`)
 
     for (const art of mainData.articles) {
+        updateLoadingMessage(`Working on article: ${art.slides[0].title}`)
         const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
         const insta_citaitons = art.instagram_citations
 
@@ -465,12 +477,21 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
             quillArticle.setContents(art.full_text)
             zip.file(`${folder_name}/article.txt`, quillArticle.getText(), { binary: false })
             zip.file(`${folder_name}/article.json`, JSON.stringify(art.full_text))
-            zip.file(`${folder_name}/article_citations.html`, getWorksCitedHTML(mainData.bib, art?.full_text_citations))
+            if(art?.full_text_citations !== undefined){
+                zip.file(`${folder_name}/article_citations.html`, getWorksCitedHTML(mainData.bib, art?.full_text_citations))
+            }
         }
 
-        if (art?.desc !== undefined) {
-            zip.file(`${folder_name}/instagram_desc.txt`, `🪡 ${art.slides[0].title.trim()}\n\n${art.desc.trim()}\n\nResources:\n${getWorksCitedText(mainData.bib, insta_citaitons)}`, { binary: false })
+        let instagram_desc = `🪡 ${art.slides[0].title.trim()}`
+        if(art.desc.trim() !== "") {
+            instagram_desc += `\n\n${art.desc.trim()}`
         }
+        const works_cited_text = getWorksCitedText(mainData.bib, insta_citaitons)
+        if(works_cited_text !== ""){
+            instagram_desc += `\n\nResources:\n${works_cited_text}`
+        }
+        zip.file(`${folder_name}/instagram_desc.txt`, instagram_desc, { binary: false })
+
         for (let i = 0; i < art.slides.length; i++) {
             zip.file(`${folder_name}/${i}.jpeg`, exportSlideToJpegData(art.slides[i], insta_citaitons), { base64: true, createFolders: true })
         }

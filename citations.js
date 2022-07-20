@@ -156,7 +156,7 @@ function getCredentials(user_id, api_key, hint) {
 // Gets the bibliography from Zotero and the citations - {key: order} pairs.
 // Returns: text of the bibliography as i. bib[key].bib
 function getWorksCitedText(bib, citations) {
-    if (bib === null || citations === null) {
+    if (bib === null || bib === undefined || citations === {} || citations === undefined) {
         return '';
     }
 
@@ -175,7 +175,7 @@ function getWorksCitedText(bib, citations) {
 }
 
 function getWorksCitedHTML(bib, citations) {
-    if (bib === null || citations === null) {
+    if (bib === null || bib === undefined || citations === null || citations === undefined) {
         return '';
     }
 
@@ -212,10 +212,8 @@ function getTextFromXML(xml) {
 
 
 // Loops over list of Slides' QuillJs objects, returns key: idx pairs of citations
+// Will also update the slide's Quill object to contain the right indexes
 function getCitationIndexes(slide_list) {
-    // Ensure that it is a list (if a single slide is passed, make it a list)
-    // slide_list = (slide_list instanceof Array) ? slide_list : [slide_list]
-
     const citation_order = {}
     let total_idx = 0;
     for (const slide of slide_list) {
