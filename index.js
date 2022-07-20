@@ -387,8 +387,7 @@ const quillDescription = new Quill('#article-description', {
 const quillArticle = new Quill('#article-qill', {
     modules: {
         toolbar: [
-            ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
-            ['blockquote', 'code-block'],
+            ['bold', 'italic', 'underline'],        // toggled buttons
 
             [{ 'list': 'ordered' }, { 'list': 'bullet' }],
             [{ 'script': 'sub' }, { 'script': 'super' }],      // superscript/subscript
@@ -407,18 +406,12 @@ const quillArticle = new Quill('#article-qill', {
     theme: 'snow',
     formats: [
         'bold',
-        'color',
-        'code',
         'italic',
         'link',
-        'size',
         'script',
         'underline',
-        'blockquote',
         'header',
-        'indent',
         'list',
-        'code-block',
         'formula',
         'image',
         'video',
