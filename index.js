@@ -577,9 +577,7 @@ document.getElementById('sync-zotero-btn').addEventListener('click', () => {
 document.getElementById('clr-work-btn').addEventListener('click', () => {
     if (window.confirm(`Use this only if you experience issues.\nThis will delete all your data, including the Zotero Key (${window.localStorage.getItem('zotero-api-key')}).`)) {
         window.localStorage.clear()
-        mainData = createCollectionObj()
-        cached_collection = createCachedZotero()
-        updateArticlesList(true)
+        location.reload()
     }
 })
 
