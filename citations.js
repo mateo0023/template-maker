@@ -125,7 +125,7 @@ function getCredentials(user_id, api_key, hint) {
         zotero_user_id_txt.value = user_id
         zotero_loader_cont.appendChild(zotero_user_id_txt)
 
-        template.innerHTML = `<p>Create your Zotero API Key <a href="https://www.zotero.org/settings/keys/new" target="_blank" rel="noreferrer noopener">here</a>. Remember to allow library read access.</p>
+        template.innerHTML = `<p>Create your Zotero API Key <a href="https://www.zotero.org/settings/keys/new" target="_blank" rel="noreferrer noopener">here</a>. Remember to allow library read access. <b>Save the key somewhere else too!</b></p>
         <label for="zotero_api_key">API Key: </label>`.trim()
         zotero_loader_cont.appendChild(template.content.firstChild)
 
@@ -189,11 +189,11 @@ function getWorksCitedHTML(bib, citations) {
     const parser = new DOMParser()
     for (const [key, idx] of list) {
         const bib_item = getItemByKey(bib, key)?.bib
-        if(bib_item !== undefined){
+        if (bib_item !== undefined) {
             const citation = parser.parseFromString(bib_item.trim(), 'text/xml')
             citation.getElementsByClassName('csl-left-margin')[0].textContent = `[${idx}]`
             citation.firstChild.children[0].id = `@${key}`
-    
+
             bibliography += citation.firstChild.outerHTML.trim()
         }
     }
@@ -217,7 +217,7 @@ function getCitationIndexes(slide_list) {
     const citation_order = {}
     let total_idx = 0;
     for (const slide of slide_list) {
-        if(slide?.content?.ops !== undefined){
+        if (slide?.content?.ops !== undefined) {
             for (const item of slide?.content?.ops) {
                 if (item.insert?.citation !== undefined) {
                     if (citation_order?.[item.insert.citation.key] === undefined) {
@@ -229,6 +229,17 @@ function getCitationIndexes(slide_list) {
         }
     }
     return citation_order
+}
+
+function mergeInto(main, secondary) {
+    if (!(main instanceof Array) || !(secondary instanceof Array))
+        return;
+
+    for (const item of secondary) {
+        if (main.find(it => it.key === item.key) === undefined) {
+            main.push(item)
+        }
+    }
 }
 
 function getCitationList(bib) {
@@ -265,6 +276,7 @@ export {
     getCitationIndexes,
     getBib,
     getZoteroCollections,
+    mergeInto,
     getCitationList,
     getWorksCitedText,
     getWorksCitedHTML
