@@ -306,7 +306,7 @@ class Slide {
     static saveProgress(slide) {
         // The description content is handled by quill
 
-        slide.title = slide_title.value
+        slide.title = (slide_title.value === 'No Title') ? '' : slide_title.value
         slide.content = quillSlide.getContents()
         if (slide.img.reverse_fit) {
             slide.img.top = getPosition()
@@ -916,7 +916,7 @@ function updateDOMSlide() {
     document.getElementById('inverse-fit-checkbox').checked = currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-container').hidden = !currentSlide.img.reverse_fit
     document.getElementById('hide-blurred-background-checkbox').checked = currentSlide.img.hide_blr_bk
-    slide_title.value = Slide.getTitle(currentSlide);
+    slide_title.value = currentSlide.title;
     quillSlide.setContents(Slide.getContent(currentSlide));
     quillSlide.history.clear();
     updateImagePreview(currentSlide, currentArticle.instagram_citations)
