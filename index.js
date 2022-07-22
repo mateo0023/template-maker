@@ -1002,7 +1002,8 @@ function clearSelected(el) {
 
 function createCollectionObj() {
     return {
-        articles: [Article.create()]
+        articles: [Article.create()],
+        bib: []
     }
 }
 
