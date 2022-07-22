@@ -144,9 +144,9 @@ class QuillCitationManager {
             const drop_container = document.getElementById('citaitons-dropdown')
             const srcs_container = document.getElementById('sources-container')
             const search_box = document.getElementById('citation-search')
-            drop_container.classList.remove('hidden')
-
+            
             const processHTML = (bib) => {
+                drop_container.classList.remove('hidden')
                 for (const pair of getCitationList(bib)) {
                     const item = document.createElement('div')
                     item.innerHTML = pair.div
@@ -183,6 +183,8 @@ class QuillCitationManager {
             } else if (cached_collection.key !== undefined && cached_collection.key === currentArticle.zotero_collection.key) {
                 processHTML(cached_collection.bib)
             } else {
+                showLoading()
+                updateLoadingMessage(`Getting items inside ${currentArticle.zotero_collection.name}`)
                 getBib(
                     window.localStorage.getItem('zotero-user-id'),
                     window.localStorage.getItem('zotero-api-key'),
@@ -193,6 +195,11 @@ class QuillCitationManager {
                         processHTML(bib)
                         mergeInto(mainData.bib, bib)
                     })
+                    .catch(e => {
+                        console.trace(e)
+                        processHTML(mainData.bib)
+                    })
+                    .finally(() => {hideLoading()})
             }
         })
     }
@@ -339,6 +346,9 @@ Quill.register('modules/citation', QuillCitationManager)
 
 // Main data object
 var mainData = (window.localStorage.hasOwnProperty('data')) ? JSON.parse(window.localStorage.getItem('data')) : createCollectionObj();
+if(mainData.bib === undefined){
+    mainData.bib = []
+}
 var cached_collection = (window.localStorage.hasOwnProperty('zotero-cache-collection')) ? JSON.parse(window.localStorage.getItem('zotero-cache-collection')) : createCachedZotero();
 var currentArticle;
 var currentSlide;
@@ -582,7 +592,7 @@ document.getElementById('clr-work-btn').addEventListener('click', () => {
 })
 
 document.getElementById('z-collection-selector').addEventListener('input', e => {
-    if (e.target.value === "undefiend") {
+    if (e.target.value === "undefiend" || e?.target?.value === undefined) {
         Article.setZoteroCollection(currentArticle, undefined, "")
     } else {
         // Cannot do e.target.children.find()
@@ -592,6 +602,7 @@ document.getElementById('z-collection-selector').addEventListener('input', e => 
                 return;
             }
         }
+        Article.setZoteroCollection(currentArticle, undefined, "Full Library")
     }
 })
 
