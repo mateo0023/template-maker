@@ -144,7 +144,7 @@ class QuillCitationManager {
             const drop_container = document.getElementById('citaitons-dropdown')
             const srcs_container = document.getElementById('sources-container')
             const search_box = document.getElementById('citation-search')
-            
+
             const processHTML = (bib) => {
                 drop_container.classList.remove('hidden')
                 for (const pair of getCitationList(bib)) {
@@ -199,7 +199,7 @@ class QuillCitationManager {
                         console.trace(e)
                         processHTML(mainData.bib)
                     })
-                    .finally(() => {hideLoading()})
+                    .finally(() => { hideLoading() })
             }
         })
     }
@@ -346,7 +346,7 @@ Quill.register('modules/citation', QuillCitationManager)
 
 // Main data object
 var mainData = (window.localStorage.hasOwnProperty('data')) ? JSON.parse(window.localStorage.getItem('data')) : createCollectionObj();
-if(mainData.bib === undefined){
+if (mainData.bib === undefined) {
     mainData.bib = []
 }
 var cached_collection = (window.localStorage.hasOwnProperty('zotero-cache-collection')) ? JSON.parse(window.localStorage.getItem('zotero-cache-collection')) : createCachedZotero();
@@ -468,8 +468,11 @@ document.getElementById('export-btn').addEventListener('click', (e) => {
     updateLoadingMessage(`Added Collection`)
 
     for (const art of mainData.articles) {
-        updateLoadingMessage(`Working on article: ${art.slides[0].title}`)
-        const folder_name = art.slides[0].title.replace(/[^a-zA-Z0-9 ]/g, "")
+        updateLoadingMessage(`Working on article: ${Slide.getTitle(art.slides[0])}`)
+        let folder_name = Slide.getTitle(art.slides[0]).replace(/[^a-zA-Z0-9 ]/g, "")
+        // Ensure there are no repeats of folder names
+        const folder_count = zip.folder(new RegExp(`${folder_name}`)).length
+        folder_name += (folder_count === 0) ? '' : `_${folder_count}`
         const insta_citaitons = art.instagram_citations
 
         if (art?.full_text !== undefined) {
@@ -985,7 +988,7 @@ function showLoading() {
 }
 
 function updateLoadingMessage(msg = "") {
-    document.getElementsByClassName("loader-message")[0].textContent = msg
+    document.getElementsByClassName("loader-message")[0].innerHTML = msg
 }
 
 function hideLoading() {
