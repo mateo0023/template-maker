@@ -455,7 +455,7 @@ quillArticle.on('text-change', (delta, oldContents, source) => {
 
 document.getElementById('save-progress').addEventListener('click', () => {
     showLoading()
-    saveToBrowser()
+    saveToBrowser(false, true)
     hideLoading()
 })
 
@@ -974,13 +974,26 @@ function removeArticle() {
     updateArticlesList(true)
 }
 
-function saveToBrowser(update_current = true) {
+function saveToBrowser(update_current = true, download_if_error = false) {
     if (update_current) {
         Slide.saveProgress(currentSlide)
         Article.updateInstaCitations(currentArticle)
     }
-    window.localStorage.setItem('data', JSON.stringify(mainData))
-    window.localStorage.setItem('zotero-cache-collection', JSON.stringify(cached_collection))
+
+    const data_str = JSON.stringify(mainData)
+    try {
+        window.localStorage.setItem('data', data_str)
+    } catch (error) {
+        if (error.name === 'QuotaExceededError' && download_if_error) {
+            saveAs(new File([data_str], "collection.json", { type: "text/plain;charset=utf-16" }));
+        }
+    }
+
+    try {
+        window.localStorage.setItem('zotero-cache-collection', JSON.stringify(cached_collection))
+    } catch (error) {
+        console.trace(error)
+    }
 }
 
 function showLoading() {
